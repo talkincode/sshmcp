@@ -1,0 +1,134 @@
+package app
+
+import (
+	"os"
+	"strings"
+
+	"sshx/internal/sshclient"
+)
+
+// ParseArgs parses command-line arguments and returns a Config.
+func ParseArgs(args []string) *sshclient.Config {
+	config := &sshclient.Config{
+		Command:     strings.Join(args[1:], " "),
+		Mode:        "ssh",
+		SafetyCheck: true,
+		Force:       false,
+	}
+
+	if password := os.Getenv("SSH_PASSWORD"); password != "" {
+		config.Password = password
+	}
+	if keyPath := os.Getenv("SSH_KEY_PATH"); keyPath != "" {
+		config.KeyPath = keyPath
+	}
+
+	if os.Getenv("SSH_NO_SAFETY_CHECK") == "true" {
+		config.SafetyCheck = false
+	}
+	if os.Getenv("SSH_FORCE") == "true" {
+		config.Force = true
+	}
+
+	sudoKey := os.Getenv("SSH_SUDO_KEY")
+	if sudoKey == "" {
+		sudoKey = sshclient.DefaultSudoKey
+	}
+	config.SudoKey = sudoKey
+
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case strings.HasPrefix(arg, "-h="), strings.HasPrefix(arg, "--host="):
+			config.Host = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "-p="), strings.HasPrefix(arg, "--port="):
+			config.Port = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "-u="), strings.HasPrefix(arg, "--user="):
+			config.User = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "-i="), strings.HasPrefix(arg, "--key="):
+			config.KeyPath = strings.SplitN(arg, "=", 2)[1]
+		case arg == "--force", arg == "-f":
+			config.Force = true
+		case arg == "--no-safety-check":
+			config.SafetyCheck = false
+		case arg == "--sftp":
+			config.Mode = "sftp"
+		case strings.HasPrefix(arg, "--upload="):
+			config.Mode = "sftp"
+			config.SftpAction = "upload"
+			config.LocalPath = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "--download="):
+			config.Mode = "sftp"
+			config.SftpAction = "download"
+			config.RemotePath = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "--to="):
+			if config.SftpAction == "upload" {
+				config.RemotePath = strings.SplitN(arg, "=", 2)[1]
+			} else if config.SftpAction == "download" {
+				config.LocalPath = strings.SplitN(arg, "=", 2)[1]
+			}
+		case strings.HasPrefix(arg, "--list="), strings.HasPrefix(arg, "--ls="):
+			config.Mode = "sftp"
+			config.SftpAction = "list"
+			config.RemotePath = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "--mkdir="):
+			config.Mode = "sftp"
+			config.SftpAction = "mkdir"
+			config.RemotePath = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "--rm="):
+			config.Mode = "sftp"
+			config.SftpAction = "remove"
+			config.RemotePath = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "--password-set="):
+			config.Mode = "password"
+			config.PasswordAction = "set"
+			parts := strings.SplitN(arg, "=", 2)
+			if len(parts) > 1 {
+				keyValue := strings.SplitN(parts[1], ":", 2)
+				config.PasswordKey = keyValue[0]
+				if len(keyValue) > 1 {
+					config.PasswordValue = keyValue[1]
+				}
+			}
+		case strings.HasPrefix(arg, "--password-get="):
+			config.Mode = "password"
+			config.PasswordAction = "get"
+			config.PasswordKey = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "--password-delete="), strings.HasPrefix(arg, "--password-del="):
+			config.Mode = "password"
+			config.PasswordAction = "delete"
+			config.PasswordKey = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "--password-check="), strings.HasPrefix(arg, "--password-exists="):
+			config.Mode = "password"
+			config.PasswordAction = "check"
+			config.PasswordKey = strings.SplitN(arg, "=", 2)[1]
+		case arg == "--password-list" || arg == "--password-ls":
+			config.Mode = "password"
+			config.PasswordAction = "list"
+		case arg == "--help":
+			PrintUsage()
+			os.Exit(0)
+		default:
+			if config.Mode == "ssh" && config.Command == "" {
+				config.Command = arg
+			}
+		}
+	}
+
+	if config.Mode == "ssh" {
+		actualCmd := []string{}
+		for i := 1; i < len(args); i++ {
+			arg := args[i]
+			if strings.HasPrefix(arg, "-") {
+				continue
+			}
+			actualCmd = append(actualCmd, arg)
+		}
+
+		if len(actualCmd) > 0 {
+			config.Command = strings.Join(actualCmd, " ")
+		}
+	}
+
+	return config
+}
