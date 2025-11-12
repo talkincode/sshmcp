@@ -187,15 +187,15 @@ func TestParseArgs_PasswordSet(t *testing.T) {
 	}{
 		{
 			name:           "with value",
-			args:           []string{"sshx", "--password-set=ma8:mypass"},
-			expectedKey:    "ma8",
+			args:           []string{"sshx", "--password-set=master:mypass"},
+			expectedKey:    "master",
 			expectedValue:  "mypass",
 			expectedAction: "set",
 		},
 		{
 			name:           "without value",
-			args:           []string{"sshx", "--password-set=ma8"},
-			expectedKey:    "ma8",
+			args:           []string{"sshx", "--password-set=master"},
+			expectedKey:    "master",
 			expectedValue:  "",
 			expectedAction: "set",
 		},
@@ -221,7 +221,7 @@ func TestParseArgs_PasswordSet(t *testing.T) {
 }
 
 func TestParseArgs_PasswordGet(t *testing.T) {
-	args := []string{"sshx", "--password-get=ma8"}
+	args := []string{"sshx", "--password-get=master"}
 	config := ParseArgs(args)
 
 	if config.Mode != "password" {
@@ -230,8 +230,8 @@ func TestParseArgs_PasswordGet(t *testing.T) {
 	if config.PasswordAction != "get" {
 		t.Errorf("Expected password action 'get', got %s", config.PasswordAction)
 	}
-	if config.PasswordKey != "ma8" {
-		t.Errorf("Expected password key 'ma8', got %s", config.PasswordKey)
+	if config.PasswordKey != "master" {
+		t.Errorf("Expected password key 'master', got %s", config.PasswordKey)
 	}
 }
 

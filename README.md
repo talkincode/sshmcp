@@ -1,38 +1,167 @@
 # sshx
 
-`sshx` 提供一个支持无障碍 SSH 命令行客户端，同时实现 MCP（Model Context Protocol）接口，方便 AI 助手调用远程 SSH/SFTP 功能。
+`sshx` provides a barrier-free SSH command-line client while implementing the MCP (Model Context Protocol) interface, enabling AI assistants to easily invoke remote SSH/SFTP functionality.
 
-## 项目结构
+## Project Structure
 
-- `cmd/sshx`：主二进制入口，负责命令行参数解析、MCP 模式启动及密码管理功能。
-- `internal/sshclient`：核心 SSH/SFTP/脚本执行逻辑、命令安全检测及连接池封装。
-- `internal/mcp`：MCP stdio 服务器实现，暴露 SSH/SFTP/脚本等工具给外部工具（例如 AI 助手）。
+- `cmd/sshx`: Main binary entry point, responsible for command-line argument parsing, MCP mode startup, and password management features.
+- `internal/sshclient`: Core SSH/SFTP/script execution logic, command security validation, and connection pool wrapper.
+- `internal/mcp`: MCP stdio server implementation, exposing SSH/SFTP/script tools to external tools (e.g., AI assistants).
 
-## 主要能力
+## Key Features
 
-1. 跨平台 SSH/SFTP 操作（支持 sudo 自动填充）。
-2. 密码管理（Keychain / Secret Service / Credential Manager）。
-3. MCP stdio 模式，可被 AI 助手调用。
-4. 连接池、脚本执行与命令安全校验。
+1. Cross-platform SSH/SFTP operations (supports sudo auto-fill).
+2. Password management (Keychain / Secret Service / Credential Manager).
+3. MCP stdio mode for AI assistant integration.
+4. Connection pooling, script execution, and command security validation.
 
-## 快速开始
+## Quick Start
 
 ```bash
-# 构建命令行工具
+# Build command-line tool
 go build -o bin/sshx ./cmd/sshx
 
-# 执行命令
+# Execute command
 ./bin/sshx -h=192.168.1.100 "uptime"
 
-# 启动 MCP stdio 模式
+# Start MCP stdio mode
 ./bin/sshx mcp-stdio
 ```
 
-## 开发
+## Password Management
 
-- `go test ./...` 运行单元测试（目前包括命令安全校验）。
-- 代码调整后请运行 `gofmt`，保持 Go 代码风格一致。
+`sshx` provides secure password storage using the operating system's native credential manager, eliminating the need to enter passwords repeatedly or store them in plaintext.
 
-## 依赖管理
+### Supported Platforms
 
-使用 Go Modules (`go.mod`) 管理第三方依赖。`go test ./...` 会自动下载所需模块。
+- **macOS**: Uses Keychain Access
+- **Linux**: Uses Secret Service (GNOME Keyring / KDE Wallet)
+- **Windows**: Uses Credential Manager
+
+### Password Commands
+
+#### Save Password
+
+```bash
+# Save password for a specific host
+./bin/sshx --set-password host=192.168.1.100 user=root
+
+# Save password with environment variables (recommended for scripts)
+export SSH_HOST=192.168.1.100
+export SSH_USER=root
+./bin/sshx --set-password
+```
+
+You will be prompted to enter the password securely (input is hidden).
+
+#### Check Saved Password
+
+```bash
+# Check if password exists for a host
+./bin/sshx --check-password host=192.168.1.100 user=root
+
+# Output example:
+# ✓ Password exists for root@192.168.1.100
+```
+
+#### List All Saved Passwords
+
+```bash
+# List all stored SSH credentials
+./bin/sshx --list-passwords
+
+# Output example:
+# Stored SSH passwords:
+# - root@192.168.1.100
+# - admin@192.168.1.101
+# - ubuntu@192.168.1.102
+```
+
+#### Delete Password
+
+```bash
+# Delete password for a specific host
+./bin/sshx --delete-password host=192.168.1.100 user=root
+
+# Confirmation message:
+# ✓ Password deleted for root@192.168.1.100
+```
+
+### Using Stored Passwords
+
+Once a password is saved, you can connect without the `-p` flag:
+
+```bash
+# Without password management (requires -p flag every time)
+./bin/sshx -h=192.168.1.100 -u=root -p=yourpassword "uptime"
+
+# With password management (no -p flag needed)
+./bin/sshx --set-password host=192.168.1.100 user=root  # Save once
+./bin/sshx -h=192.168.1.100 -u=root "uptime"            # Use forever
+```
+
+### Password Priority
+
+When executing SSH commands, `sshx` follows this priority order:
+
+1. **Command-line password** (`-p` flag) - highest priority
+2. **Environment variable** (`SSH_PASSWORD`)
+3. **Stored password** (from system credential manager)
+4. **Interactive prompt** - if none of the above are available
+
+### Security Notes
+
+- ✅ Passwords are stored using OS-native encryption
+- ✅ Passwords are never stored in plaintext
+- ✅ Each host+user combination has a separate password entry
+- ✅ Password input is hidden during entry
+- ⚠️ Requires OS credential manager to be available
+- ⚠️ On Linux, requires Secret Service daemon running (usually automatic with desktop environments)
+
+### Environment Variables
+
+You can use environment variables to avoid typing credentials repeatedly:
+
+```bash
+# Set in .env file or export in shell
+export SSH_HOST=192.168.1.100
+export SSH_USER=root
+export SSH_PORT=22
+export SUDO_PASSWORD=your_sudo_password
+
+# Then run commands without flags
+./bin/sshx "uptime"
+```
+
+### Example Workflow
+
+```bash
+# 1. Save password once
+./bin/sshx --set-password host=192.168.1.100 user=root
+# Enter password: ******
+
+# 2. Verify it's saved
+./bin/sshx --check-password host=192.168.1.100 user=root
+# ✓ Password exists for root@192.168.1.100
+
+# 3. Use it for SSH commands (no password needed)
+./bin/sshx -h=192.168.1.100 -u=root "ls -la /var/log"
+./bin/sshx -h=192.168.1.100 -u=root "df -h"
+
+# 4. Use it for SFTP operations (no password needed)
+./bin/sshx -h=192.168.1.100 -u=root --sftp-get /etc/hosts ./hosts.txt
+./bin/sshx -h=192.168.1.100 -u=root --sftp-put ./local.txt /tmp/remote.txt
+
+# 5. When done, optionally delete the password
+./bin/sshx --delete-password host=192.168.1.100 user=root
+# ✓ Password deleted for root@192.168.1.100
+```
+
+## Development
+
+- `go test ./...` runs unit tests (currently includes command security validation).
+- After code changes, please run `gofmt` to maintain consistent Go code style.
+
+## Dependency Management
+
+Uses Go Modules (`go.mod`) to manage third-party dependencies. `go test ./...` will automatically download required modules.

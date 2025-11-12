@@ -1,0 +1,46 @@
+root = true
+
+# 所有文件默认设置
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Go 源文件
+[*.go]
+indent_style = tab
+indent_size = 4
+
+# Python 文件
+[*.py]
+indent_style = space
+indent_size = 4
+
+# JavaScript 文件
+[*.js]
+indent_style = space
+indent_size = 4
+
+# JSON 文件
+[*.json]
+indent_style = space
+indent_size = 2
+
+# YAML 文件
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Makefile
+[Makefile]
+indent_style = tab
+
+# Markdown 文件（保留尾随空格用于换行）
+[*.md]
+trim_trailing_whitespace = false
+
+# Shell 脚本
+[*.sh]
+indent_style = space
+indent_size = 2

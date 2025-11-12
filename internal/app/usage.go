@@ -74,7 +74,7 @@ Password Management (Cross-Platform):
 Environment Variables (.env):
   SSH_PASSWORD          SSH password (not recommended, use SSH keys or keyring)
   SSH_KEY_PATH          SSH private key path
-  SSH_SUDO_KEY          Sudo password keyring key name (default: ma8)
+  SSH_SUDO_KEY          Sudo password keyring key name (default: master)
   SSH_NO_SAFETY_CHECK   Disable safety checks (true/false)
   SSH_FORCE             Force execution mode (true/false)
 
@@ -82,7 +82,7 @@ SSH Examples:
   # Execute simple command (default user: master)
   sshx -h=192.168.1.100 "uptime"
 
-  # Execute sudo command (auto password from keyring: ma8)
+  # Execute sudo command (auto password from keyring: master)
   sshx -h=192.168.1.100 "sudo systemctl status docker"
 
   # Custom SSH port
@@ -119,16 +119,16 @@ SFTP Examples:
 
 Password Management Examples:
   # Set sudo password (interactive prompt)
-  sshx --password-set=ma8
+  sshx --password-set=master
 
   # Set sudo password (inline, not recommended for security)
-  sshx --password-set=ma8:mypassword
+  sshx --password-set=master:mypassword
 
   # Set custom password
   sshx --password-set=myserver
 
   # Get password
-  sshx --password-get=ma8
+  sshx --password-get=master
 
   # Check if password exists
   sshx --password-check=test-password
@@ -137,16 +137,16 @@ Password Management Examples:
   sshx --password-list
 
   # Delete password
-  sshx --password-delete=ma8
+  sshx --password-delete=master
 
   # Set password for specific server
   sshx --password-set=prod-server:secretpass
-  sshx -h=prod-server "sudo reboot"  # Will use ENV SSH_SUDO_KEY or ma8
+  sshx -h=prod-server "sudo reboot"  # Will use ENV SSH_SUDO_KEY or master
 
 Note:
   - SSH key authentication is tried first, then password authentication
   - Sudo password is automatically retrieved from system keyring
   - SFTP operations use the same SSH connection
   - Password manager works across macOS/Linux/Windows
-  - Default user: master, Default sudo key: ma8`)
+  - Default user: master, Default sudo key: master`)
 }

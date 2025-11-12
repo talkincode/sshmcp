@@ -137,7 +137,7 @@ func listPasswords() error {
 	fmt.Println()
 
 	commonKeys := []string{
-		"ma8",
+		"master",
 		"sudo",
 		"root",
 		"admin",

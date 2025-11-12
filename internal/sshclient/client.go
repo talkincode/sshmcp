@@ -17,7 +17,7 @@ import (
 const (
 	DefaultSSHPort    = "22"
 	DefaultSSHUser    = "master"
-	DefaultSudoKey    = "ma8"
+	DefaultSudoKey    = "master"
 	DefaultTimeout    = 30 * time.Second
 	SudoPrompt        = "[sudo] password"
 	PasswordPromptEnd = ": "

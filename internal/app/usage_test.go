@@ -151,7 +151,7 @@ func TestPrintUsage_Examples(t *testing.T) {
 	examples := []string{
 		`sshx -h=192.168.1.100 "uptime"`,
 		`sshx -h=192.168.1.100 "sudo systemctl status docker"`,
-		`sshx --password-set=ma8`,
+		`sshx --password-set=master`,
 		`--upload=local.txt --to=/tmp/remote.txt`,
 		`--download=/var/log/app.log`,
 	}

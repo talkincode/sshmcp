@@ -102,7 +102,7 @@ func defineMCPTools() []MCPTool {
 					"sudo_key": {
 						Type:        "string",
 						Description: "Key name for sudo password",
-						Default:     "ma8",
+						Default:     "master",
 					},
 					"force": {
 						Type:        "string",

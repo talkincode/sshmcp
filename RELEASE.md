@@ -1,29 +1,32 @@
-# 发布新版本指南
+# Release Guide
 
-## 自动发布流程
+## Automated Release Process
 
-本项目配置了自动化的 CI/CD 流程，当推送新的版本标签时会自动构建并发布。
+This project is configured with automated CI/CD workflow that builds and publishes releases when new version tags are pushed.
 
-## 发布步骤
+## Release Steps
 
-### 1. 更新版本信息
+### 1. Update Version Information
 
-首先更新 `CHANGELOG.md`，记录本次发布的变更：
+First, update `CHANGELOG.md` to record the changes for this release:
 
 ```markdown
 ## [1.0.1] - 2025-01-15
 
 ### Added
-- 新功能说明
+
+- New feature description
 
 ### Changed
-- 变更说明
+
+- Changes description
 
 ### Fixed
-- 修复说明
+
+- Bug fixes description
 ```
 
-### 2. 提交变更
+### 2. Commit Changes
 
 ```bash
 git add .
@@ -31,150 +34,154 @@ git commit -m "chore: prepare for release v1.0.1"
 git push origin main
 ```
 
-### 3. 创建并推送标签
+### 3. Create and Push Tag
 
 ```bash
-# 创建标签
+# Create tag
 git tag -a v1.0.1 -m "Release v1.0.1"
 
-# 推送标签到远程仓库
+# Push tag to remote repository
 git push origin v1.0.1
 ```
 
-### 4. 自动化构建
+### 4. Automated Build
 
-推送标签后，GitHub Actions 会自动：
+After pushing the tag, GitHub Actions will automatically:
 
-1. ✅ 构建以下平台的二进制文件：
+1. ✅ Build binaries for the following platforms:
+
    - Linux x86_64
    - Linux ARM64
    - macOS x86_64 (Intel)
    - macOS ARM64 (Apple Silicon)
    - Windows x86_64
 
-2. ✅ 为每个二进制文件创建压缩包：
-   - Linux/macOS: `.tar.gz` 格式
-   - Windows: `.zip` 格式
+2. ✅ Create compressed archives for each binary:
 
-3. ✅ 生成 SHA256 校验和文件 (`checksums.txt`)
+   - Linux/macOS: `.tar.gz` format
+   - Windows: `.zip` format
 
-4. ✅ 自动创建 GitHub Release
+3. ✅ Generate SHA256 checksums file (`checksums.txt`)
 
-5. ✅ 上传所有二进制文件到 Release
+4. ✅ Automatically create GitHub Release
 
-### 5. 验证发布
+5. ✅ Upload all binaries to the Release
 
-访问 GitHub Releases 页面验证：
+### 5. Verify Release
+
+Visit the GitHub Releases page to verify:
+
 ```
 https://github.com/talkincode/sshmcp/releases
 ```
 
-检查：
-- ✅ Release 已创建
-- ✅ 所有 5 个平台的二进制文件已上传
-- ✅ checksums.txt 文件存在
-- ✅ Release 说明完整
+Check:
 
-## 版本号规范
+- ✅ Release has been created
+- ✅ All 5 platform binaries have been uploaded
+- ✅ checksums.txt file exists
+- ✅ Release notes are complete
 
-遵循 [语义化版本](https://semver.org/lang/zh-CN/) 规范：
+## Version Numbering
 
-- **主版本号 (MAJOR)**: 不兼容的 API 修改
-- **次版本号 (MINOR)**: 向下兼容的功能性新增
-- **修订号 (PATCH)**: 向下兼容的问题修正
+Follow [Semantic Versioning](https://semver.org/) specification:
 
-示例：
-- `v1.0.0` - 首次正式发布
-- `v1.1.0` - 添加新功能
-- `v1.1.1` - 修复 bug
-- `v2.0.0` - 重大变更，不向下兼容
+- **MAJOR version**: incompatible API changes
+- **MINOR version**: backwards-compatible functionality additions
+- **PATCH version**: backwards-compatible bug fixes
 
-## 预发布版本
+Examples:
 
-如需发布测试版本：
+Examples:
+
+- `v1.0.0` - Initial stable release
+- `v1.1.0` - Add new features
+- `v1.1.1` - Bug fixes
+- `v2.0.0` - Breaking changes, not backwards compatible
+
+## Pre-release Versions
+
+To publish a test version:
 
 ```bash
-# Beta 版本
+# Beta version
 git tag -a v1.1.0-beta.1 -m "Release v1.1.0-beta.1"
 git push origin v1.1.0-beta.1
 
-# Release Candidate 版本
+# Release Candidate version
 git tag -a v1.1.0-rc.1 -m "Release v1.1.0-rc.1"
 git push origin v1.1.0-rc.1
 ```
 
-预发布版本会在 GitHub Release 中标记为 "Pre-release"。
+Pre-release versions will be marked as "Pre-release" in GitHub Release.
 
-## 删除错误的标签
+## Delete Incorrect Tags
 
-如果推送了错误的标签：
+If you pushed an incorrect tag:
 
 ```bash
-# 删除本地标签
+# Delete local tag
 git tag -d v1.0.1
 
-# 删除远程标签
+# Delete remote tag
 git push origin :refs/tags/v1.0.1
 ```
 
-## 手动构建（开发测试）
+## Manual Build (Development Testing)
 
-如需在本地测试构建：
+To test the build locally:
 
 ```bash
-# 构建所有平台
+# Build all platforms
 make build-all
 
-# 查看构建结果
+# View build results
 ls -lh bin/
 ```
 
-## 故障排查
+## Troubleshooting
 
-### 构建失败
+### Build Failure
 
-1. 检查 GitHub Actions 日志
-2. 验证 `go.mod` 依赖是否正确
-3. 确保所有测试通过：`make test`
+1. Check GitHub Actions logs
+2. Verify `go.mod` dependencies are correct
+3. Ensure all tests pass: `make test`
 
-### Release 未创建
+### Release Not Created
 
-1. 检查标签格式是否为 `v*.*.*`
-2. 验证 GitHub Actions 权限设置
-3. 检查 `GITHUB_TOKEN` 是否有效
+1. Check if tag format matches `v*.*.*`
+2. Verify GitHub Actions permissions
+3. Check if `GITHUB_TOKEN` is valid
 
-### 文件上传失败
+### File Upload Failure
 
-1. 检查文件大小限制
-2. 验证网络连接
-3. 查看 Actions 日志中的详细错误信息
+1. Check file size limits
+2. Verify network connection
+3. Review detailed error messages in Actions logs
 
-## CI/CD 工作流
+## CI/CD Workflows
 
-### Release 工作流 (.github/workflows/release.yml)
+### Release Workflow (.github/workflows/release.yml)
 
-触发条件：推送 `v*.*.*` 格式的标签
+Trigger: Push tags matching `v*.*.*` format
 
-任务：
-1. 检出代码
-2. 设置 Go 环境
-3. 构建多平台二进制
-4. 生成校验和
-5. 创建 GitHub Release
-6. 上传文件
+Tasks:
 
-### CI 工作流 (.github/workflows/ci.yml)
+1. Checkout code
 
-触发条件：推送到 main/develop 分支或 Pull Request
+### CI Workflow (.github/workflows/ci.yml)
 
-任务：
-1. 在多个操作系统上运行测试
-2. 生成代码覆盖率报告
-3. 运行代码检查 (golangci-lint)
-4. 运行安全扫描 (gosec)
+Trigger: Push to main/develop branches or Pull Requests
 
-## 参考资源
+Tasks:
 
-- [GitHub Actions 文档](https://docs.github.com/en/actions)
-- [Go Release 工作流示例](https://github.com/marketplace/actions/go-release-binaries)
-- [语义化版本规范](https://semver.org/lang/zh-CN/)
+1. Run tests on multiple operating systems
+2. Generate code coverage reports
+3. Run code checks (golangci-lint)
+4. Run security scans (gosec)
+
+## Reference Resources
+
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [Go Release Workflow Examples](https://github.com/marketplace/actions/go-release-binaries)
+- [Semantic Versioning Specification](https://semver.org/)
