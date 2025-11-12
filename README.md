@@ -15,17 +15,88 @@
 3. MCP stdio mode for AI assistant integration.
 4. Connection pooling, script execution, and command security validation.
 
-## Quick Start
+## Installation
+
+### One-Line Installation (Recommended)
+
+#### Linux / macOS
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/talkincode/sshmcp/main/install.sh | bash
+```
+
+Or download and run:
+
+```bash
+wget https://raw.githubusercontent.com/talkincode/sshmcp/main/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+Install specific version:
+
+```bash
+./install.sh v0.0.2
+```
+
+#### Windows
+
+Open PowerShell as Administrator and run:
+
+```powershell
+irm https://raw.githubusercontent.com/talkincode/sshmcp/main/install.ps1 | iex
+```
+
+Or download and run:
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/talkincode/sshmcp/main/install.ps1" -OutFile "install.ps1"
+.\install.ps1
+```
+
+Install specific version:
+
+```powershell
+.\install.ps1 -Version v0.0.2
+```
+
+### Manual Installation
+
+Download pre-built binaries from [Releases](https://github.com/talkincode/sshmcp/releases):
+
+1. Download the appropriate binary for your platform
+2. Extract the archive
+3. Move the binary to your PATH (e.g., `/usr/local/bin` on Unix-like systems)
+4. Make it executable: `chmod +x sshx` (Unix-like systems only)
+
+### Build from Source
+
+```bash
+# Clone repository
+git clone https://github.com/talkincode/sshmcp.git
+cd sshmcp
+
 # Build command-line tool
 go build -o bin/sshx ./cmd/sshx
 
-# Execute command
-./bin/sshx -h=192.168.1.100 "uptime"
+# Install to system (optional)
+make install
+```
+
+## Quick Start
+
+```bash
+# Execute remote command
+sshx -h=192.168.1.100 -u=root "uptime"
+
+# Save password for easier access
+sshx --set-password host=192.168.1.100 user=root
+
+# Execute command without password flag (uses saved password)
+sshx -h=192.168.1.100 -u=root "df -h"
 
 # Start MCP stdio mode
-./bin/sshx mcp-stdio
+sshx mcp-stdio
 ```
 
 ## Password Management
