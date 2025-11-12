@@ -1,4 +1,4 @@
-# sshx
+# SSHMCP
 
 `sshx` provides a barrier-free SSH command-line client while implementing the MCP (Model Context Protocol) interface, enabling AI assistants to easily invoke remote SSH/SFTP functionality.
 
