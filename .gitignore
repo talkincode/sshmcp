@@ -7,3 +7,4 @@ coverage.out
 /testdatas/
 __debug_bin*
 coverage.*
+bin/
