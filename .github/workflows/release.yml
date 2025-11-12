@@ -1,0 +1,148 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Get version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build binaries
+        run: |
+          # 创建输出目录
+          mkdir -p dist
+
+          # 定义构建函数
+          build() {
+            local os=$1
+            local arch=$2
+            local output="dist/sshx-${os}-${arch}"
+            
+            if [ "$os" = "windows" ]; then
+              output="${output}.exe"
+            fi
+            
+            echo "Building for $os/$arch..."
+            GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build \
+              -ldflags="-s -w -X main.Version=${{ steps.get_version.outputs.VERSION }}" \
+              -o "$output" \
+              ./cmd/sshx
+            
+            # 压缩二进制文件
+            if [ "$os" = "windows" ]; then
+              zip "dist/sshx-${os}-${arch}.zip" "$output"
+              rm "$output"
+            else
+              tar czf "dist/sshx-${os}-${arch}.tar.gz" -C dist "$(basename $output)"
+              rm "$output"
+            fi
+          }
+
+          # 构建所有平台
+          build linux amd64
+          build linux arm64
+          build darwin amd64
+          build darwin arm64
+          build windows amd64
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## SSH & SFTP Remote Tool with MCP Support
+
+            ### 下载说明
+
+            请根据您的操作系统选择对应的二进制文件：
+
+            - **Linux (x86_64)**: `sshx-linux-amd64.tar.gz`
+            - **Linux (ARM64)**: `sshx-linux-arm64.tar.gz`
+            - **macOS (Intel)**: `sshx-darwin-amd64.tar.gz`
+            - **macOS (Apple Silicon)**: `sshx-darwin-arm64.tar.gz`
+            - **Windows (x86_64)**: `sshx-windows-amd64.zip`
+
+            ### 安装方法
+
+            #### Linux / macOS
+            ```bash
+            # 下载并解压
+            tar xzf sshx-<platform>-<arch>.tar.gz
+
+            # 移动到系统路径
+            sudo mv sshx /usr/local/bin/
+
+            # 赋予执行权限
+            sudo chmod +x /usr/local/bin/sshx
+
+            # 验证安装
+            sshx --help
+            ```
+
+            #### Windows
+            ```powershell
+            # 解压 zip 文件
+            # 将 sshx.exe 添加到系统 PATH
+            # 或直接在解压目录下使用
+            ```
+
+            ### 功能特性
+
+            - ✅ SSH 远程命令执行
+            - ✅ SFTP 文件传输（上传/下载/列表/创建目录/删除）
+            - ✅ 跨平台密码管理（系统 Keyring）
+            - ✅ 命令安全检查（防止危险操作）
+            - ✅ MCP (Model Context Protocol) 支持
+            - ✅ Sudo 密码自动填充
+
+            ### 校验和
+
+            请使用 `checksums.txt` 验证下载文件的完整性：
+            ```bash
+            sha256sum -c checksums.txt
+            ```
+
+            ### 更新日志
+
+            查看 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) 了解详细更新内容。
+
+          files: |
+            dist/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: dist/*
+          retention-days: 30
