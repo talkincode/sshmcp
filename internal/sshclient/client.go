@@ -94,14 +94,24 @@ func (c *SSHClient) connectDirect() error {
 	var authMethods []ssh.AuthMethod
 
 	if c.config.KeyPath != "" {
-		if key, err := os.ReadFile(c.config.KeyPath); err == nil {
+		// 展开路径中的 ~ 为用户主目录
+		keyPath := c.config.KeyPath
+		if strings.HasPrefix(keyPath, "~/") {
+			if home, err := os.UserHomeDir(); err == nil {
+				keyPath = filepath.Join(home, keyPath[2:])
+			}
+		}
+
+		if key, err := os.ReadFile(keyPath); err == nil {
 			signer, err := ssh.ParsePrivateKey(key)
 			if err == nil {
 				authMethods = append(authMethods, ssh.PublicKeys(signer))
-				log.Printf("Using SSH key: %s", c.config.KeyPath)
+				log.Printf("Using SSH key: %s", keyPath)
 			} else {
 				log.Printf("Warning: failed to parse SSH key: %v", err)
 			}
+		} else {
+			log.Printf("Warning: failed to read SSH key file %s: %v", keyPath, err)
 		}
 	}
 
