@@ -50,25 +50,42 @@ detect_platform() {
     esac
     
     # Detect Architecture
-    case "$(uname -m)" in
-        x86_64|amd64)   arch="amd64" ;;
-        aarch64|arm64)  arch="arm64" ;;
-        *)
-            print_error "Unsupported architecture: $(uname -m)"
-            exit 1
-        ;;
-    esac
+    # On macOS, use sysctl to get the real hardware architecture (not affected by Rosetta 2)
+    if [ "$os" = "darwin" ]; then
+        local hw_arch=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "")
+        if echo "$hw_arch" | grep -q "Apple"; then
+            # Apple Silicon
+            arch="arm64"
+        else
+            # Intel Mac or fallback to uname
+            local machine=$(uname -m)
+            case "$machine" in
+                x86_64|amd64)   arch="amd64" ;;
+                arm64|aarch64)  arch="arm64" ;;
+                *)              arch="amd64" ;; # Default to amd64 for Intel
+            esac
+        fi
+    else
+        # For Linux, use uname -m
+        case "$(uname -m)" in
+            x86_64|amd64)   arch="amd64" ;;
+            aarch64|arm64)  arch="arm64" ;;
+            *)
+                print_error "Unsupported architecture: $(uname -m)"
+                exit 1
+            ;;
+        esac
+    fi
     
     echo "${os}-${arch}"
 }
 
 # Get latest version from GitHub
 get_latest_version() {
-    print_info "Fetching latest version..."
     local latest_version=$(curl -sL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     
     if [ -z "$latest_version" ]; then
-        print_error "Failed to fetch latest version"
+        print_error "Failed to fetch latest version" >&2
         exit 1
     fi
     
@@ -81,6 +98,7 @@ install_sshx() {
     local version="$VERSION"
     
     if [ "$version" = "latest" ]; then
+        print_info "Fetching latest version..."
         version=$(get_latest_version)
     fi
     
