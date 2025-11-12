@@ -144,13 +144,30 @@ install_sshx() {
         exit 1
     }
     
+    # Find the extracted binary (handle both 'sshx' and platform-specific names)
+    local binary_file=""
+    if [ -f "$BINARY_NAME" ]; then
+        binary_file="$BINARY_NAME"
+        elif [ -f "${BINARY_NAME}-${platform}" ]; then
+        binary_file="${BINARY_NAME}-${platform}"
+    else
+        # Try to find any executable file
+        binary_file=$(find . -maxdepth 1 -type f -executable | head -n 1)
+        if [ -z "$binary_file" ]; then
+            print_error "Could not find binary in extracted archive"
+            print_info "Contents: $(ls -la)"
+            rm -rf "$tmp_dir"
+            exit 1
+        fi
+    fi
+    
     # Install
     print_info "Installing to ${INSTALL_DIR}..."
     
     if [ -w "$INSTALL_DIR" ]; then
-        mv "$BINARY_NAME" "$INSTALL_DIR/" && chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
+        cp "$binary_file" "${INSTALL_DIR}/${BINARY_NAME}" && chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
     else
-        sudo mv "$BINARY_NAME" "$INSTALL_DIR/" && sudo chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
+        sudo cp "$binary_file" "${INSTALL_DIR}/${BINARY_NAME}" && sudo chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
     fi
     
     # Cleanup
