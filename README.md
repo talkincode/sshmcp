@@ -65,6 +65,7 @@ Install specific version:
 Download pre-built binaries from [Releases](https://github.com/talkincode/sshmcp/releases):
 
 **Linux / macOS:**
+
 ```bash
 # Download and extract (replace <platform>-<arch> with your system)
 tar -xzf sshx-<platform>-<arch>.tar.gz
@@ -80,6 +81,7 @@ sshx --help
 ```
 
 **Windows:**
+
 1. Download `sshx-windows-amd64.zip`
 2. Extract the archive
 3. Move `sshx.exe` to a directory in your PATH (e.g., `C:\Program Files\sshx`)
@@ -249,6 +251,7 @@ export SUDO_PASSWORD=your_sudo_password
 ### "sshx: command not found"
 
 **Solution:**
+
 - Ensure `/usr/local/bin` (or your installation directory) is in your PATH
 - Restart your terminal after installation
 - Or run with full path: `/usr/local/bin/sshx`
