@@ -64,10 +64,26 @@ Install specific version:
 
 Download pre-built binaries from [Releases](https://github.com/talkincode/sshmcp/releases):
 
-1. Download the appropriate binary for your platform
+**Linux / macOS:**
+```bash
+# Download and extract (replace <platform>-<arch> with your system)
+tar -xzf sshx-<platform>-<arch>.tar.gz
+
+# Move to system path
+sudo mv sshx /usr/local/bin/
+
+# Make executable
+sudo chmod +x /usr/local/bin/sshx
+
+# Verify installation
+sshx --help
+```
+
+**Windows:**
+1. Download `sshx-windows-amd64.zip`
 2. Extract the archive
-3. Move the binary to your PATH (e.g., `/usr/local/bin` on Unix-like systems)
-4. Make it executable: `chmod +x sshx` (Unix-like systems only)
+3. Move `sshx.exe` to a directory in your PATH (e.g., `C:\Program Files\sshx`)
+4. Or add the extracted directory to your system PATH
 
 ### Build from Source
 
@@ -228,11 +244,52 @@ export SUDO_PASSWORD=your_sudo_password
 # ✓ Password deleted for root@192.168.1.100
 ```
 
+## Troubleshooting
+
+### "sshx: command not found"
+
+**Solution:**
+- Ensure `/usr/local/bin` (or your installation directory) is in your PATH
+- Restart your terminal after installation
+- Or run with full path: `/usr/local/bin/sshx`
+
+### macOS Security Warning
+
+macOS may block the binary on first run:
+
+```bash
+sudo xattr -rd com.apple.quarantine /usr/local/bin/sshx
+```
+
+Or go to System Preferences → Security & Privacy → Click "Allow Anyway"
+
+### Windows SmartScreen Warning
+
+Click "More info" and then "Run anyway" if Windows Defender SmartScreen shows a warning.
+
+### Permission Denied
+
+```bash
+# Make sure the binary has execute permissions
+sudo chmod +x /usr/local/bin/sshx
+```
+
 ## Development
 
-- `go test ./...` runs unit tests (currently includes command security validation).
-- After code changes, please run `gofmt` to maintain consistent Go code style.
+```bash
+# Run tests
+go test ./...
 
-## Dependency Management
+# Format code
+gofmt -w .
 
-Uses Go Modules (`go.mod`) to manage third-party dependencies. `go test ./...` will automatically download required modules.
+# Build for all platforms
+make build-all
+
+# Run linter
+make lint
+```
+
+## License
+
+This project is licensed under the terms specified in the repository.

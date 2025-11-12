@@ -38,17 +38,17 @@ jobs:
             local os=$1
             local arch=$2
             local output="dist/sshx-${os}-${arch}"
-            
+
             if [ "$os" = "windows" ]; then
               output="${output}.exe"
             fi
-            
+
             echo "Building for $os/$arch..."
             GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build \
               -ldflags="-s -w -X main.Version=${{ steps.get_version.outputs.VERSION }}" \
               -o "$output" \
               ./cmd/sshx
-            
+
             # 压缩二进制文件
             if [ "$os" = "windows" ]; then
               zip "dist/sshx-${os}-${arch}.zip" "$output"
@@ -79,7 +79,23 @@ jobs:
           body: |
             ## SSH & SFTP Remote Tool with MCP Support
 
-            ### 下载说明
+            ### 🚀 一键安装 (推荐)
+
+            #### Linux / macOS
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
+            ```
+
+            #### Windows (PowerShell 管理员权限)
+            ```powershell
+            irm https://raw.githubusercontent.com/${{ github.repository }}/main/install.ps1 | iex
+            ```
+
+            📖 **详细安装文档**: [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/INSTALL.md)
+
+            ---
+
+            ### 📦 手动下载
 
             请根据您的操作系统选择对应的二进制文件：
 
@@ -89,7 +105,7 @@ jobs:
             - **macOS (Apple Silicon)**: `sshx-darwin-arm64.tar.gz`
             - **Windows (x86_64)**: `sshx-windows-amd64.zip`
 
-            ### 安装方法
+            ### 📝 手动安装方法
 
             #### Linux / macOS
             ```bash
