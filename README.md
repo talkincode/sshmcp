@@ -1,3 +1,43 @@
+```
+ $$$$$$\   $$$$$$\  $$\   $$\ $$\      $$\  $$$$$$\  $$$$$$$\
+$$  __$$\ $$  __$$\ $$ |  $$ |$$$\    $$$ |$$  __$$\ $$  __$$\
+$$ /  \__|$$ /  \__|$$ |  $$ |$$$$\  $$$$ |$$ /  \__|$$ |  $$ |
+\$$$$$$\  \$$$$$$\  $$$$$$$$ |$$\$$\$$ $$ |$$ |      $$$$$$$  |
+ \____$$\  \____$$\ $$  __$$ |$$ \$$$  $$ |$$ |      $$  ____/
+$$\   $$ |$$\   $$ |$$ |  $$ |$$ |\$  /$$ |$$ |  $$\ $$ |
+\$$$$$$  |\$$$$$$  |$$ |  $$ |$$ | \_/ $$ |\$$$$$$  |$$ |
+ \______/  \______/ \__|  \__|\__|     \__| \______/ \__|
+
+
+Secure SSH & SFTP Client with MCP Protocol Support
+```
+
+<div align="center">
+
+[![Go Version](https://img.shields.io/github/go-mod/go-version/talkincode/sshmcp?style=flat-square&logo=go&logoColor=white)](https://go.dev/)
+[![Release](https://img.shields.io/github/v/release/talkincode/sshmcp?style=flat-square&logo=github)](https://github.com/talkincode/sshmcp/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://github.com/talkincode/sshmcp/blob/main/LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/talkincode/sshmcp?style=flat-square)](https://goreportcard.com/report/github.com/talkincode/sshmcp)
+
+[![GitHub Stars](https://img.shields.io/github/stars/talkincode/sshmcp?style=flat-square&logo=github)](https://github.com/talkincode/sshmcp/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/talkincode/sshmcp?style=flat-square&logo=github)](https://github.com/talkincode/sshmcp/network/members)
+[![GitHub Issues](https://img.shields.io/github/issues/talkincode/sshmcp?style=flat-square&logo=github)](https://github.com/talkincode/sshmcp/issues)
+[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/talkincode/sshmcp?style=flat-square&logo=github)](https://github.com/talkincode/sshmcp/pulls)
+
+[![GitHub Downloads](https://img.shields.io/github/downloads/talkincode/sshmcp/total?style=flat-square&logo=github)](https://github.com/talkincode/sshmcp/releases)
+[![GitHub Contributors](https://img.shields.io/github/contributors/talkincode/sshmcp?style=flat-square&logo=github)](https://github.com/talkincode/sshmcp/graphs/contributors)
+[![Last Commit](https://img.shields.io/github/last-commit/talkincode/sshmcp?style=flat-square&logo=github)](https://github.com/talkincode/sshmcp/commits/main)
+[![Repo Size](https://img.shields.io/github/repo-size/talkincode/sshmcp?style=flat-square&logo=github)](https://github.com/talkincode/sshmcp)
+
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square&logo=linux&logoColor=white)](https://github.com/talkincode/sshmcp/releases)
+[![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05-orange?style=flat-square)](https://modelcontextprotocol.io)
+[![Made with Go](https://img.shields.io/badge/Made%20with-Go-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://github.com/talkincode/sshmcp/pulls)
+
+</div>
+
+---
+
 # SSHMCP
 
 `sshx` provides a barrier-free SSH command-line client while implementing the MCP (Model Context Protocol) interface, enabling AI assistants to easily invoke remote SSH/SFTP functionality.
@@ -295,4 +335,17 @@ make lint
 
 ## License
 
-This project is licensed under the terms specified in the repository.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+
+**[Documentation](https://github.com/talkincode/sshmcp/wiki)** •
+**[Issues](https://github.com/talkincode/sshmcp/issues)** •
+**[Discussions](https://github.com/talkincode/sshmcp/discussions)** •
+**[Releases](https://github.com/talkincode/sshmcp/releases)**
+
+Made with ❤️ by [talkincode](https://github.com/talkincode)
+
+</div>

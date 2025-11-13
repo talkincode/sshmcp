@@ -28,6 +28,33 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          # 移除 'v' 前缀以匹配 CHANGELOG 中的版本号
+          VERSION_NUMBER="${VERSION#v}"
+
+          # 提取对应版本的 changelog
+          awk -v ver="$VERSION_NUMBER" '
+            /^## \['"$VERSION_NUMBER"'\]/ { flag=1; next }
+            /^## \[/ { if(flag) exit }
+            flag { print }
+          ' CHANGELOG.md > /tmp/release_notes.md
+
+          # 如果没有提取到内容，使用默认消息
+          if [ ! -s /tmp/release_notes.md ]; then
+            echo "No changelog entry found for version $VERSION_NUMBER" > /tmp/release_notes.md
+            echo "Please check CHANGELOG.md for details." >> /tmp/release_notes.md
+          fi
+
+          # 输出到环境变量
+          {
+            echo 'CHANGELOG<<EOF'
+            cat /tmp/release_notes.md
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
       - name: Build binaries
         run: |
           # 创建输出目录
@@ -77,77 +104,47 @@ jobs:
         with:
           name: Release ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## SSH & SFTP Remote Tool with MCP Support
+            ## SSHMCP - Secure SSH & SFTP Client with MCP Protocol Support
 
-            ### 🚀 一键安装 (推荐)
+            ### 📋 What's Changed
 
-            #### Linux / macOS
+            ${{ steps.changelog.outputs.CHANGELOG }}
+
+            ---
+
+            ### 🚀 Quick Install
+
+            **Linux / macOS:**
             ```bash
             curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
             ```
 
-            #### Windows (PowerShell 管理员权限)
+            **Windows (PowerShell):**
             ```powershell
             irm https://raw.githubusercontent.com/${{ github.repository }}/main/install.ps1 | iex
             ```
 
-            📖 **详细安装文档**: [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/INSTALL.md)
+            ---
+
+            ### 📦 Downloads
+
+            | Platform | Architecture | File |
+            |----------|--------------|------|
+            | Linux | x86_64 | `sshx-linux-amd64.tar.gz` |
+            | Linux | ARM64 | `sshx-linux-arm64.tar.gz` |
+            | macOS | Intel | `sshx-darwin-amd64.tar.gz` |
+            | macOS | Apple Silicon | `sshx-darwin-arm64.tar.gz` |
+            | Windows | x86_64 | `sshx-windows-amd64.zip` |
+
+            **Verify downloads:** Use `checksums.txt` for integrity verification
 
             ---
 
-            ### 📦 手动下载
+            ### 📚 Documentation
 
-            请根据您的操作系统选择对应的二进制文件：
-
-            - **Linux (x86_64)**: `sshx-linux-amd64.tar.gz`
-            - **Linux (ARM64)**: `sshx-linux-arm64.tar.gz`
-            - **macOS (Intel)**: `sshx-darwin-amd64.tar.gz`
-            - **macOS (Apple Silicon)**: `sshx-darwin-arm64.tar.gz`
-            - **Windows (x86_64)**: `sshx-windows-amd64.zip`
-
-            ### 📝 手动安装方法
-
-            #### Linux / macOS
-            ```bash
-            # 下载并解压
-            tar xzf sshx-<platform>-<arch>.tar.gz
-
-            # 移动到系统路径
-            sudo mv sshx /usr/local/bin/
-
-            # 赋予执行权限
-            sudo chmod +x /usr/local/bin/sshx
-
-            # 验证安装
-            sshx --help
-            ```
-
-            #### Windows
-            ```powershell
-            # 解压 zip 文件
-            # 将 sshx.exe 添加到系统 PATH
-            # 或直接在解压目录下使用
-            ```
-
-            ### 功能特性
-
-            - ✅ SSH 远程命令执行
-            - ✅ SFTP 文件传输（上传/下载/列表/创建目录/删除）
-            - ✅ 跨平台密码管理（系统 Keyring）
-            - ✅ 命令安全检查（防止危险操作）
-            - ✅ MCP (Model Context Protocol) 支持
-            - ✅ Sudo 密码自动填充
-
-            ### 校验和
-
-            请使用 `checksums.txt` 验证下载文件的完整性：
-            ```bash
-            sha256sum -c checksums.txt
-            ```
-
-            ### 更新日志
-
-            查看 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) 了解详细更新内容。
+            - [Full Documentation](https://github.com/${{ github.repository }}/blob/main/README.md)
+            - [Installation Guide](https://github.com/${{ github.repository }}/blob/main/README.md#installation)
+            - [Changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
 
           files: |
             dist/*
