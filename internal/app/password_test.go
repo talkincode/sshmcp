@@ -9,7 +9,11 @@ import (
 func TestIsWindows(t *testing.T) {
 	// Save original env
 	origOS := os.Getenv("OS")
-	defer func() { _ = os.Setenv("OS", origOS) }()
+	defer func() {
+		if err := os.Setenv("OS", origOS); err != nil {
+			t.Logf("Failed to restore OS env: %v", err)
+		}
+	}()
 
 	tests := []struct {
 		name     string
@@ -24,7 +28,9 @@ func TestIsWindows(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = os.Setenv("OS", tt.osEnv)
+			if err := os.Setenv("OS", tt.osEnv); err != nil {
+				t.Fatalf("Failed to set OS env: %v", err)
+			}
 			result := isWindows()
 			if result != tt.expected {
 				t.Errorf("isWindows() = %v, expected %v", result, tt.expected)

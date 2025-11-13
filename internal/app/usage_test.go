@@ -11,19 +11,26 @@ import (
 func TestPrintUsage(t *testing.T) {
 	// Capture stdout
 	old := os.Stdout
-	r, w, _ := os.Pipe()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Failed to create pipe: %v", err)
+	}
 	os.Stdout = w
 
 	// Call PrintUsage
 	PrintUsage()
 
 	// Restore stdout
-	_ = w.Close()
+	if closeErr := w.Close(); closeErr != nil {
+		t.Logf("Failed to close pipe writer: %v", closeErr)
+	}
 	os.Stdout = old
 
 	// Read captured output
 	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
+	if _, copyErr := io.Copy(&buf, r); copyErr != nil {
+		t.Logf("Failed to copy pipe output: %v", copyErr)
+	}
 	output := buf.String()
 
 	// Verify output contains key sections
@@ -109,16 +116,23 @@ func TestPrintUsage(t *testing.T) {
 func TestPrintUsage_OutputFormat(t *testing.T) {
 	// Capture stdout
 	old := os.Stdout
-	r, w, _ := os.Pipe()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Failed to create pipe: %v", err)
+	}
 	os.Stdout = w
 
 	PrintUsage()
 
-	_ = w.Close()
+	if closeErr := w.Close(); closeErr != nil {
+		t.Logf("Failed to close pipe writer: %v", closeErr)
+	}
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
+	if _, copyErr := io.Copy(&buf, r); copyErr != nil {
+		t.Logf("Failed to copy pipe output: %v", copyErr)
+	}
 	output := buf.String()
 
 	// Verify output starts with newline (for proper formatting)
@@ -135,16 +149,23 @@ func TestPrintUsage_OutputFormat(t *testing.T) {
 
 func TestPrintUsage_Examples(t *testing.T) {
 	old := os.Stdout
-	r, w, _ := os.Pipe()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Failed to create pipe: %v", err)
+	}
 	os.Stdout = w
 
 	PrintUsage()
 
-	_ = w.Close()
+	if closeErr := w.Close(); closeErr != nil {
+		t.Logf("Failed to close pipe writer: %v", closeErr)
+	}
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
+	if _, copyErr := io.Copy(&buf, r); copyErr != nil {
+		t.Logf("Failed to copy pipe output: %v", copyErr)
+	}
 	output := buf.String()
 
 	// Verify practical examples exist

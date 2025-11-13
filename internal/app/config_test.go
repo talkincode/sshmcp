@@ -317,19 +317,39 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 
 	// Cleanup
 	defer func() {
-		_ = os.Setenv("SSH_PASSWORD", origPassword)
-		_ = os.Setenv("SSH_KEY_PATH", origKeyPath)
-		_ = os.Setenv("SSH_NO_SAFETY_CHECK", origNoSafety)
-		_ = os.Setenv("SSH_FORCE", origForce)
-		_ = os.Setenv("SSH_SUDO_KEY", origSudoKey)
+		if err := os.Setenv("SSH_PASSWORD", origPassword); err != nil {
+			t.Logf("Failed to restore SSH_PASSWORD: %v", err)
+		}
+		if err := os.Setenv("SSH_KEY_PATH", origKeyPath); err != nil {
+			t.Logf("Failed to restore SSH_KEY_PATH: %v", err)
+		}
+		if err := os.Setenv("SSH_NO_SAFETY_CHECK", origNoSafety); err != nil {
+			t.Logf("Failed to restore SSH_NO_SAFETY_CHECK: %v", err)
+		}
+		if err := os.Setenv("SSH_FORCE", origForce); err != nil {
+			t.Logf("Failed to restore SSH_FORCE: %v", err)
+		}
+		if err := os.Setenv("SSH_SUDO_KEY", origSudoKey); err != nil {
+			t.Logf("Failed to restore SSH_SUDO_KEY: %v", err)
+		}
 	}()
 
 	// Test password from env
-	_ = os.Setenv("SSH_PASSWORD", "envpass")
-	_ = os.Setenv("SSH_KEY_PATH", "/env/key/path")
-	_ = os.Setenv("SSH_NO_SAFETY_CHECK", "true")
-	_ = os.Setenv("SSH_FORCE", "true")
-	_ = os.Setenv("SSH_SUDO_KEY", "custom-sudo")
+	if err := os.Setenv("SSH_PASSWORD", "envpass"); err != nil {
+		t.Fatalf("Failed to set SSH_PASSWORD: %v", err)
+	}
+	if err := os.Setenv("SSH_KEY_PATH", "/env/key/path"); err != nil {
+		t.Fatalf("Failed to set SSH_KEY_PATH: %v", err)
+	}
+	if err := os.Setenv("SSH_NO_SAFETY_CHECK", "true"); err != nil {
+		t.Fatalf("Failed to set SSH_NO_SAFETY_CHECK: %v", err)
+	}
+	if err := os.Setenv("SSH_FORCE", "true"); err != nil {
+		t.Fatalf("Failed to set SSH_FORCE: %v", err)
+	}
+	if err := os.Setenv("SSH_SUDO_KEY", "custom-sudo"); err != nil {
+		t.Fatalf("Failed to set SSH_SUDO_KEY: %v", err)
+	}
 
 	args := []string{"sshx", "-h=host", "uptime"}
 	config := ParseArgs(args)
@@ -354,8 +374,14 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 func TestParseArgs_DefaultSudoKey(t *testing.T) {
 	// Clear SSH_SUDO_KEY
 	origSudoKey := os.Getenv("SSH_SUDO_KEY")
-	_ = os.Unsetenv("SSH_SUDO_KEY")
-	defer func() { _ = os.Setenv("SSH_SUDO_KEY", origSudoKey) }()
+	if err := os.Unsetenv("SSH_SUDO_KEY"); err != nil {
+		t.Fatalf("Failed to unset SSH_SUDO_KEY: %v", err)
+	}
+	defer func() {
+		if err := os.Setenv("SSH_SUDO_KEY", origSudoKey); err != nil {
+			t.Logf("Failed to restore SSH_SUDO_KEY: %v", err)
+		}
+	}()
 
 	args := []string{"sshx", "-h=host", "uptime"}
 	config := ParseArgs(args)

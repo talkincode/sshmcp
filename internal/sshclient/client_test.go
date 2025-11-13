@@ -42,7 +42,10 @@ func TestNewSSHClient(t *testing.T) {
 				assert.Equal(t, DefaultSSHPort, client.config.Port)
 				assert.Equal(t, DefaultSSHUser, client.config.User)
 				// KeyPath should be set to default ~/.ssh/id_rsa
-				home, _ := os.UserHomeDir()
+				home, err := os.UserHomeDir()
+				if err != nil {
+					t.Fatalf("Failed to get user home dir: %v", err)
+				}
 				expectedKeyPath := filepath.Join(home, ".ssh", "id_rsa")
 				assert.Equal(t, expectedKeyPath, client.config.KeyPath)
 			},

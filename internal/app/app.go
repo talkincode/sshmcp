@@ -23,8 +23,8 @@ func Run(args []string) (err error) {
 		log.SetOutput(io.Discard)
 
 		server := mcp.NewMCPServer()
-		if err := server.Start(); err != nil {
-			return err
+		if startErr := server.Start(); startErr != nil {
+			return startErr
 		}
 		return nil
 	}
@@ -44,17 +44,17 @@ func Run(args []string) (err error) {
 
 	// Handle password management mode
 	if config.Mode == "password" {
-		if err := HandlePasswordManagement(config); err != nil {
-			return fmt.Errorf("password management failed: %w", err)
+		if pwdErr := HandlePasswordManagement(config); pwdErr != nil {
+			return fmt.Errorf("password management failed: %w", pwdErr)
 		}
 		return nil
 	}
 
 	// Auto-fill sudo password if needed
 	if strings.Contains(config.Command, "sudo") && config.SudoKey != "" {
-		password, err := sshclient.GetSudoPassword(config.SudoKey)
-		if err != nil {
-			log.Printf("Warning: failed to get sudo password from keyring: %v", err)
+		password, pwdErr := sshclient.GetSudoPassword(config.SudoKey)
+		if pwdErr != nil {
+			log.Printf("Warning: failed to get sudo password from keyring: %v", pwdErr)
 			log.Println("Continuing without sudo password auto-fill...")
 		} else {
 			config.Password = password

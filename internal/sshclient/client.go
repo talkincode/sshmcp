@@ -206,8 +206,8 @@ func (c *SSHClient) connectDirect() error {
 // ExecuteCommand executes a command
 func (c *SSHClient) ExecuteCommand() (err error) {
 	if c.config.SafetyCheck && !c.config.Force {
-		if err := ValidateCommand(c.config.Command); err != nil {
-			return err
+		if validateErr := ValidateCommand(c.config.Command); validateErr != nil {
+			return validateErr
 		}
 	} else if c.config.Force {
 		log.Println("⚠️  Safety check skipped (--force mode)")
@@ -229,8 +229,8 @@ func (c *SSHClient) ExecuteCommand() (err error) {
 // ExecuteCommandWithOutput executes a command and returns the output
 func (c *SSHClient) ExecuteCommandWithOutput() (output string, err error) {
 	if c.config.SafetyCheck && !c.config.Force {
-		if err := ValidateCommand(c.config.Command); err != nil {
-			return "", err
+		if validateErr := ValidateCommand(c.config.Command); validateErr != nil {
+			return "", validateErr
 		}
 	}
 

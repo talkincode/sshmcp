@@ -12,17 +12,24 @@ import (
 func TestRun_NoArgs(t *testing.T) {
 	// Capture stdout
 	old := os.Stdout
-	r, w, _ := os.Pipe()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Failed to create pipe: %v", err)
+	}
 	os.Stdout = w
 
 	args := []string{"sshx"}
-	err := Run(args)
+	err = Run(args)
 
-	_ = w.Close()
+	if closeErr := w.Close(); closeErr != nil {
+		t.Logf("Failed to close pipe writer: %v", closeErr)
+	}
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
+	if _, copyErr := io.Copy(&buf, r); copyErr != nil {
+		t.Logf("Failed to copy pipe output: %v", copyErr)
+	}
 
 	// Should return ErrUsage
 	if !errors.Is(err, ErrUsage) {
@@ -129,18 +136,25 @@ func TestRun_ArgumentParsing(t *testing.T) {
 			// Suppress output
 			oldStdout := os.Stdout
 			oldStderr := os.Stderr
-			r, w, _ := os.Pipe()
+			r, w, err := os.Pipe()
+			if err != nil {
+				t.Fatalf("Failed to create pipe: %v", err)
+			}
 			os.Stdout = w
 			os.Stderr = w
 
-			err := Run(tt.args)
+			err = Run(tt.args)
 
-			_ = w.Close()
+			if closeErr := w.Close(); closeErr != nil {
+				t.Logf("Failed to close pipe writer: %v", closeErr)
+			}
 			os.Stdout = oldStdout
 			os.Stderr = oldStderr
 
 			// Drain pipe
-			_, _ = io.Copy(io.Discard, r)
+			if _, copyErr := io.Copy(io.Discard, r); copyErr != nil {
+				t.Logf("Failed to drain pipe: %v", copyErr)
+			}
 
 			if tt.shouldError && err == nil {
 				t.Error("Expected error but got nil")

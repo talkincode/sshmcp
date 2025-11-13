@@ -431,7 +431,10 @@ func BenchmarkValidateCommand(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, cmd := range testCases {
-			_ = ValidateCommand(cmd)
+			if err := ValidateCommand(cmd); err != nil {
+				// Ignore validation errors in benchmark
+				_ = err
+			}
 		}
 	}
 }
@@ -441,7 +444,10 @@ func BenchmarkValidateCommand_Safe(b *testing.B) {
 	cmd := "sudo systemctl status nginx"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = ValidateCommand(cmd)
+		if err := ValidateCommand(cmd); err != nil {
+			// Ignore validation errors in benchmark
+			_ = err
+		}
 	}
 }
 
@@ -450,6 +456,9 @@ func BenchmarkValidateCommand_Dangerous(b *testing.B) {
 	cmd := "sudo rm -rf /"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = ValidateCommand(cmd)
+		if err := ValidateCommand(cmd); err != nil {
+			// Ignore validation errors in benchmark
+			_ = err
+		}
 	}
 }

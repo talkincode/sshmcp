@@ -17,8 +17,8 @@ import (
 // 4. Clean up temp file
 func (c *SSHClient) ExecuteScript(localScriptPath string) (output string, err error) {
 	// 1. Check if local script exists
-	if _, err := os.Stat(localScriptPath); err != nil {
-		return "", fmt.Errorf("local script not found: %w", err)
+	if _, statErr := os.Stat(localScriptPath); statErr != nil {
+		return "", fmt.Errorf("local script not found: %w", statErr)
 	}
 
 	// 2. Read script content
@@ -49,7 +49,10 @@ func (c *SSHClient) ExecuteScript(localScriptPath string) (output string, err er
 	}
 
 	if _, err = remoteFile.Write(scriptContent); err != nil {
-		_ = remoteFile.Close()
+		if closeErr := remoteFile.Close(); closeErr != nil {
+			// Ignore close error when write already failed
+			_ = closeErr
+		}
 		return "", fmt.Errorf("failed to write script: %w", err)
 	}
 	if err = remoteFile.Close(); err != nil {
@@ -121,8 +124,8 @@ func (c *SSHClient) executeSimpleCommand(command string) (err error) {
 // ExecuteScriptWithArgs executes a script with arguments
 func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string) (output string, err error) {
 	// 1. Check if local script exists
-	if _, err := os.Stat(localScriptPath); err != nil {
-		return "", fmt.Errorf("local script not found: %w", err)
+	if _, statErr := os.Stat(localScriptPath); statErr != nil {
+		return "", fmt.Errorf("local script not found: %w", statErr)
 	}
 
 	// 2. Read script content

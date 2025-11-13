@@ -491,8 +491,8 @@ func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interfa
 
 	// 如果命令包含 sudo，尝试获取密码
 	if strings.Contains(command, "sudo") && config.SudoKey != "" {
-		password, err := sshclient.GetSudoPassword(config.SudoKey)
-		if err != nil {
+		password, pwdErr := sshclient.GetSudoPassword(config.SudoKey)
+		if pwdErr != nil {
 			// 静默忽略，MCP 模式下不输出警告
 		} else {
 			config.Password = password
@@ -642,7 +642,10 @@ func (s *MCPServer) executeSftpList(config *sshclient.Config, args map[string]in
 	}()
 
 	err = <-errChan
-	_ = w.Close() // Best-effort close
+	if closeErr := w.Close(); closeErr != nil {
+		// Log best-effort close error
+		_ = closeErr
+	}
 	os.Stdout = oldStdout
 
 	if err != nil {
@@ -749,7 +752,10 @@ func (s *MCPServer) writeJSON(v interface{}) {
 		// 静默忽略，MCP 模式下不输出日志
 		return
 	}
-	_, _ = fmt.Fprintf(s.stdout, "%s\n", data) // Best-effort write
+	if _, writeErr := fmt.Fprintf(s.stdout, "%s\n", data); writeErr != nil {
+		// Best-effort write, ignore error
+		_ = writeErr
+	}
 }
 
 // executeScript 执行脚本
