@@ -1,4 +1,4 @@
-version: 2
+version: "2"
 
 run:
   timeout: 5m
@@ -21,23 +21,23 @@ linters:
     - noctx
     - gosec
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
 
-  govet:
-    enable:
-      - shadow
+    govet:
+      enable:
+        - shadow
 
-  gofmt:
-    simplify: true
+    gofmt:
+      simplify: true
 
-  misspell:
-    locale: US
+    misspell:
+      locale: US
 
-  nakedret:
-    max-func-lines: 30
+    nakedret:
+      max-func-lines: 30
 
 issues:
   exclude-rules:
