@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 const (
@@ -23,8 +25,7 @@ const (
 	PasswordPromptEnd = ": "
 )
 
-// Config SSH配置
-// Config properties for connecting to remote hosts.
+// Config represents SSH configuration properties for connecting to remote hosts.
 type Config struct {
 	Host     string
 	Port     string
@@ -47,12 +48,70 @@ type Config struct {
 	PasswordValue  string
 }
 
-// SSHClient SSH客户端
 // SSHClient wraps an ssh.Client with optional pooled and sftp helpers.
 type SSHClient struct {
 	config     *Config
 	client     *ssh.Client
 	sftpClient *sftp.Client
+}
+
+// getHostKeyCallback returns a secure host key callback function
+// It tries to use known_hosts file, falls back to InsecureIgnoreHostKey with warning
+func getHostKeyCallback() ssh.HostKeyCallback {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("⚠️  Warning: Unable to get home directory, using insecure host key verification")
+		// #nosec G106 -- This is a fallback when known_hosts is unavailable
+		return ssh.InsecureIgnoreHostKey()
+	}
+
+	knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
+
+	// Try to use known_hosts file
+	hostKeyCallback, err := knownhosts.New(knownHostsPath)
+	if err != nil {
+		// If known_hosts doesn't exist or can't be read, create it or use insecure mode
+		if os.IsNotExist(err) {
+			log.Printf("⚠️  Warning: known_hosts file not found at %s", knownHostsPath)
+			log.Printf("⚠️  Using insecure host key verification (vulnerable to MITM attacks)")
+			log.Printf("💡 Tip: Run 'ssh-keyscan %s >> %s' to add host keys", "HOST", knownHostsPath)
+		} else {
+			log.Printf("⚠️  Warning: Failed to load known_hosts: %v", err)
+			log.Printf("⚠️  Using insecure host key verification")
+		}
+		// #nosec G106 -- Documented fallback with user warning
+		return ssh.InsecureIgnoreHostKey()
+	}
+
+	// Wrap the callback to handle key verification errors gracefully
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		err := hostKeyCallback(hostname, remote, key)
+		if err != nil {
+			// Check if it's a knownhosts.KeyError (host key mismatch or unknown host)
+			var keyErr *knownhosts.KeyError
+			if errors, ok := err.(*knownhosts.KeyError); ok {
+				keyErr = errors
+				// If there are known keys but they don't match, it's a key change
+				if len(keyErr.Want) > 0 {
+					return fmt.Errorf("⚠️  HOST KEY VERIFICATION FAILED!\n"+
+						"The host key for %s has changed.\n"+
+						"This could indicate a man-in-the-middle attack.\n"+
+						"Remove the old key from %s and verify the new key before connecting.\n"+
+						"Original error: %w", hostname, knownHostsPath, err)
+				}
+				// If no known keys exist, it's an unknown host
+				return fmt.Errorf("⚠️  Host %s is not in known_hosts file.\n"+
+					"To add this host, run:\n"+
+					"  ssh-keyscan -H %s >> %s\n"+
+					"Or connect manually first:\n"+
+					"  ssh %s@%s\n"+
+					"Original error: %w",
+					hostname, hostname, knownHostsPath, "USER", hostname, err)
+			}
+			return err
+		}
+		return nil
+	}
 }
 
 // NewSSHClient 创建SSH客户端
@@ -76,7 +135,7 @@ func NewSSHClient(config *Config) (*SSHClient, error) {
 	return &SSHClient{config: config}, nil
 }
 
-// Connect 建立SSH连接（优先使用连接池）
+// Connect establishes an SSH connection (prefers using connection pool)
 func (c *SSHClient) Connect() error {
 	pool := GetConnectionPool()
 	client, err := pool.GetConnection(c.config)
@@ -89,12 +148,12 @@ func (c *SSHClient) Connect() error {
 	return c.connectDirect()
 }
 
-// connectDirect 直接建立SSH连接（不使用连接池）
+// connectDirect establishes a direct SSH connection (without using connection pool)
 func (c *SSHClient) connectDirect() error {
 	var authMethods []ssh.AuthMethod
 
 	if c.config.KeyPath != "" {
-		// 展开路径中的 ~ 为用户主目录
+		// Expand ~ in path to user home directory
 		keyPath := c.config.KeyPath
 		if strings.HasPrefix(keyPath, "~/") {
 			if home, err := os.UserHomeDir(); err == nil {
@@ -127,7 +186,7 @@ func (c *SSHClient) connectDirect() error {
 	sshConfig := &ssh.ClientConfig{
 		User:            c.config.User,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: getHostKeyCallback(),
 		Timeout:         DefaultTimeout,
 	}
 
@@ -144,14 +203,14 @@ func (c *SSHClient) connectDirect() error {
 	return nil
 }
 
-// ExecuteCommand 执行命令
+// ExecuteCommand executes a command
 func (c *SSHClient) ExecuteCommand() error {
 	if c.config.SafetyCheck && !c.config.Force {
 		if err := ValidateCommand(c.config.Command); err != nil {
 			return err
 		}
 	} else if c.config.Force {
-		log.Println("⚠️  安全检查已跳过 (--force 模式)")
+		log.Println("⚠️  Safety check skipped (--force mode)")
 	}
 
 	session, err := c.client.NewSession()
@@ -167,7 +226,7 @@ func (c *SSHClient) ExecuteCommand() error {
 	return c.executeWithPTY(session)
 }
 
-// ExecuteCommandWithOutput 执行命令并返回输出
+// ExecuteCommandWithOutput executes a command and returns the output
 func (c *SSHClient) ExecuteCommandWithOutput() (string, error) {
 	if c.config.SafetyCheck && !c.config.Force {
 		if err := ValidateCommand(c.config.Command); err != nil {
@@ -207,7 +266,7 @@ func (c *SSHClient) ExecuteCommandWithOutput() (string, error) {
 	return output, nil
 }
 
-// executeWithPTY 使用PTY执行命令
+// executeWithPTY executes a command using PTY
 func (c *SSHClient) executeWithPTY(session *ssh.Session) error {
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          0,
@@ -243,7 +302,7 @@ func (c *SSHClient) executeWithPTY(session *ssh.Session) error {
 	return nil
 }
 
-// executeNormal 执行普通命令（不使用PTY）
+// executeNormal executes a normal command (without PTY)
 func (c *SSHClient) executeNormal(session *ssh.Session) error {
 	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout
@@ -268,7 +327,7 @@ func (c *SSHClient) executeNormal(session *ssh.Session) error {
 	return nil
 }
 
-// executeInteractive 执行交互式命令（支持自动输入sudo密码）
+// executeInteractive executes an interactive command (supports auto sudo password input)
 func (c *SSHClient) executeInteractive(session *ssh.Session) error {
 	var finalCmd string
 	if c.config.Password != "" {
@@ -303,7 +362,7 @@ func (c *SSHClient) executeInteractive(session *ssh.Session) error {
 	return nil
 }
 
-// ExecuteSftp 执行SFTP操作
+// ExecuteSftp executes SFTP operations
 func (c *SSHClient) ExecuteSftp() error {
 	sftpClient, err := sftp.NewClient(c.client)
 	if err != nil {
@@ -455,7 +514,7 @@ func (c *SSHClient) removeDirectory(path string) error {
 	return c.sftpClient.RemoveDirectory(path)
 }
 
-// Close 关闭连接（释放回连接池）
+// Close closes the connection (releases back to connection pool)
 func (c *SSHClient) Close() error {
 	if c.config != nil {
 		pool := GetConnectionPool()
@@ -464,7 +523,7 @@ func (c *SSHClient) Close() error {
 	return nil
 }
 
-// ForceClose 强制关闭连接（不释放回连接池）
+// ForceClose forcefully closes the connection (does not release back to pool)
 func (c *SSHClient) ForceClose() error {
 	if c.client != nil {
 		return c.client.Close()

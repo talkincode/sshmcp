@@ -10,29 +10,29 @@ import (
 	"github.com/pkg/sftp"
 )
 
-// ExecuteScript 执行本地脚本文件
-// 1. 上传脚本到远程临时目录
-// 2. 添加执行权限
-// 3. 执行脚本
-// 4. 清理临时文件
+// ExecuteScript executes a local script file
+// 1. Upload script to remote temp directory
+// 2. Add execute permission
+// 3. Execute script
+// 4. Clean up temp file
 func (c *SSHClient) ExecuteScript(localScriptPath string) (string, error) {
-	// 1. 检查本地脚本是否存在
+	// 1. Check if local script exists
 	if _, err := os.Stat(localScriptPath); err != nil {
 		return "", fmt.Errorf("local script not found: %w", err)
 	}
 
-	// 2. 读取脚本内容
+	// 2. Read script content
 	scriptContent, err := os.ReadFile(localScriptPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read script: %w", err)
 	}
 
-	// 3. 生成远程临时文件路径
+	// 3. Generate remote temp file path
 	scriptName := filepath.Base(localScriptPath)
 	timestamp := time.Now().Unix()
 	remotePath := fmt.Sprintf("/tmp/sshx-script-%d-%s", timestamp, scriptName)
 
-	// 4. 确保有 SFTP 客户端
+	// 4. Ensure SFTP client is available
 	if c.sftpClient == nil {
 		sftpClient, err := sftp.NewClient(c.client)
 		if err != nil {
@@ -42,7 +42,7 @@ func (c *SSHClient) ExecuteScript(localScriptPath string) (string, error) {
 		defer c.sftpClient.Close()
 	}
 
-	// 5. 上传脚本到远程
+	// 5. Upload script to remote
 	remoteFile, err := c.sftpClient.Create(remotePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create remote file: %w", err)
@@ -54,19 +54,19 @@ func (c *SSHClient) ExecuteScript(localScriptPath string) (string, error) {
 	}
 	remoteFile.Close()
 
-	// 6. 添加执行权限
+	// 6. Add execute permission
 	if err := c.sftpClient.Chmod(remotePath, 0755); err != nil {
 		return "", fmt.Errorf("failed to chmod script: %w", err)
 	}
 
-	// 7. 执行脚本
+	// 7. Execute script
 	output, execErr := c.executeRemoteScript(remotePath)
 
-	// 8. 清理临时文件（无论执行成功与否）
+	// 8. Clean up temp file (regardless of execution result)
 	cleanupCmd := fmt.Sprintf("rm -f %s", remotePath)
 	c.executeSimpleCommand(cleanupCmd)
 
-	// 9. 返回执行结果
+	// 9. Return execution result
 	if execErr != nil {
 		return output, fmt.Errorf("script execution failed: %w", execErr)
 	}
@@ -74,7 +74,7 @@ func (c *SSHClient) ExecuteScript(localScriptPath string) (string, error) {
 	return output, nil
 }
 
-// executeRemoteScript 执行远程脚本
+// executeRemoteScript executes a remote script
 func (c *SSHClient) executeRemoteScript(remotePath string) (string, error) {
 	session, err := c.client.NewSession()
 	if err != nil {
@@ -82,7 +82,7 @@ func (c *SSHClient) executeRemoteScript(remotePath string) (string, error) {
 	}
 	defer session.Close()
 
-	// 检测脚本类型并执行
+	// Detect script type and execute
 	var command string
 	if strings.HasSuffix(remotePath, ".sh") || strings.HasSuffix(remotePath, ".bash") {
 		command = fmt.Sprintf("bash %s", remotePath)
@@ -93,7 +93,7 @@ func (c *SSHClient) executeRemoteScript(remotePath string) (string, error) {
 	} else if strings.HasSuffix(remotePath, ".rb") {
 		command = fmt.Sprintf("ruby %s", remotePath)
 	} else {
-		// 默认当作 shell 脚本
+		// Default to shell script
 		command = fmt.Sprintf("bash %s", remotePath)
 	}
 
@@ -101,7 +101,7 @@ func (c *SSHClient) executeRemoteScript(remotePath string) (string, error) {
 	return string(output), err
 }
 
-// executeSimpleCommand 执行简单命令（用于清理等操作）
+// executeSimpleCommand executes a simple command (used for cleanup, etc.)
 func (c *SSHClient) executeSimpleCommand(command string) error {
 	session, err := c.client.NewSession()
 	if err != nil {
@@ -112,25 +112,25 @@ func (c *SSHClient) executeSimpleCommand(command string) error {
 	return session.Run(command)
 }
 
-// ExecuteScriptWithArgs 执行脚本并传递参数
+// ExecuteScriptWithArgs executes a script with arguments
 func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string) (string, error) {
-	// 1. 检查本地脚本是否存在
+	// 1. Check if local script exists
 	if _, err := os.Stat(localScriptPath); err != nil {
 		return "", fmt.Errorf("local script not found: %w", err)
 	}
 
-	// 2. 读取脚本内容
+	// 2. Read script content
 	scriptContent, err := os.ReadFile(localScriptPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read script: %w", err)
 	}
 
-	// 3. 生成远程临时文件路径
+	// 3. Generate remote temp file path
 	scriptName := filepath.Base(localScriptPath)
 	timestamp := time.Now().Unix()
 	remotePath := fmt.Sprintf("/tmp/sshx-script-%d-%s", timestamp, scriptName)
 
-	// 4. 确保有 SFTP 客户端
+	// 4. Ensure SFTP client is available
 	if c.sftpClient == nil {
 		sftpClient, err := sftp.NewClient(c.client)
 		if err != nil {
@@ -140,7 +140,7 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 		defer c.sftpClient.Close()
 	}
 
-	// 5. 上传脚本
+	// 5. Upload script
 	remoteFile, err := c.sftpClient.Create(remotePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create remote file: %w", err)
@@ -152,23 +152,23 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 	}
 	remoteFile.Close()
 
-	// 6. 添加执行权限
+	// 6. Add execute permission
 	if err := c.sftpClient.Chmod(remotePath, 0755); err != nil {
 		return "", fmt.Errorf("failed to chmod script: %w", err)
 	}
 
-	// 7. 构建带参数的命令
+	// 7. Build command with arguments
 	var command string
 	interpreter := c.detectInterpreter(remotePath)
 	escapedArgs := make([]string, len(args))
 	for i, arg := range args {
-		// 简单的参数转义
+		// Simple argument escaping
 		escapedArgs[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(arg, "'", "'\\''"))
 	}
 
 	command = fmt.Sprintf("%s %s %s", interpreter, remotePath, strings.Join(escapedArgs, " "))
 
-	// 8. 执行脚本
+	// 8. Execute script
 	session, err := c.client.NewSession()
 	if err != nil {
 		c.executeSimpleCommand(fmt.Sprintf("rm -f %s", remotePath))
@@ -178,10 +178,10 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 
 	output, execErr := session.CombinedOutput(command)
 
-	// 9. 清理临时文件
+	// 9. Clean up temp file
 	c.executeSimpleCommand(fmt.Sprintf("rm -f %s", remotePath))
 
-	// 10. 返回执行结果
+	// 10. Return execution result
 	if execErr != nil {
 		return string(output), fmt.Errorf("script execution failed: %w", execErr)
 	}
@@ -189,7 +189,7 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 	return string(output), nil
 }
 
-// detectInterpreter 检测脚本解释器
+// detectInterpreter detects the script interpreter
 func (c *SSHClient) detectInterpreter(remotePath string) string {
 	if strings.HasSuffix(remotePath, ".sh") || strings.HasSuffix(remotePath, ".bash") {
 		return "bash"
@@ -200,5 +200,5 @@ func (c *SSHClient) detectInterpreter(remotePath string) string {
 	} else if strings.HasSuffix(remotePath, ".rb") {
 		return "ruby"
 	}
-	return "bash" // 默认
+	return "bash" // Default
 }

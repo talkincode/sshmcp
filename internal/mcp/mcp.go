@@ -52,14 +52,14 @@ type Property struct {
 	Default     string   `json:"default,omitempty"`
 }
 
-// MCPServer MCP服务器
+// MCPServer represents an MCP server instance
 type MCPServer struct {
 	stdin  *bufio.Reader
 	stdout io.Writer
 	tools  []MCPTool
 }
 
-// NewMCPServer 创建MCP服务器
+// NewMCPServer creates a new MCP server instance
 func NewMCPServer() *MCPServer {
 	return &MCPServer{
 		stdin:  bufio.NewReader(os.Stdin),
@@ -68,7 +68,7 @@ func NewMCPServer() *MCPServer {
 	}
 }
 
-// defineMCPTools 定义MCP工具
+// defineMCPTools defines all available MCP tools
 func defineMCPTools() []MCPTool {
 	return []MCPTool{
 		{
@@ -307,10 +307,10 @@ func defineMCPTools() []MCPTool {
 	}
 }
 
-// Start 启动MCP服务器
+// Start starts the MCP server and handles JSON-RPC communication
 func (s *MCPServer) Start() error {
-	// MCP stdio 模式下不输出日志，避免干扰 JSON-RPC 通信
-	// log 已在 main.go 中设置为 io.Discard
+	// In MCP stdio mode, log output is disabled to avoid interfering with JSON-RPC communication
+	// log is set to io.Discard in main.go
 
 	for {
 		line, err := s.stdin.ReadString('\n')

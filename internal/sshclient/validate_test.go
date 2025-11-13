@@ -15,81 +15,81 @@ func TestValidateCommand_DangerousKeywords(t *testing.T) {
 	}{
 		// 删除根目录相关
 		{
-			name:      "删除根目录",
+			name:      "Delete root directory",
 			command:   "sudo rm -rf /",
 			wantError: true,
-			reason:    "删除根目录",
+			reason:    "Delete root directory",
 		},
 		{
-			name:      "删除根目录所有文件",
+			name:      "Delete all files in root",
 			command:   "rm -rf /*",
 			wantError: true,
-			reason:    "删除根目录下所有文件",
+			reason:    "Delete all files in root directory",
 		},
 		{
-			name:      "删除用户主目录",
+			name:      "Delete user home directory",
 			command:   "rm -rf ~",
 			wantError: true,
-			reason:    "删除用户主目录",
+			reason:    "Delete user home directory",
 		},
 		{
-			name:      "删除用户主目录带斜杠",
+			name:      "Delete home directory with slash",
 			command:   "rm -rf ~/",
 			wantError: true,
-			reason:    "删除用户主目录",
+			reason:    "Delete user home directory",
 		},
 		{
-			name:      "删除HOME变量",
+			name:      "Delete HOME variable",
 			command:   "rm -rf $HOME",
 			wantError: true,
-			reason:    "删除 $HOME 目录",
+			reason:    "Delete $HOME directory",
 		},
 		// Fork 炸弹
 		{
-			name:      "Fork炸弹",
+			name:      "Fork bomb",
 			command:   ":(){:|:&};:",
 			wantError: true,
-			reason:    "Fork 炸弹",
+			reason:    "Fork bomb",
 		},
 		// 系统文件覆盖
 		{
-			name:      "覆盖passwd文件",
+			name:      "Overwrite passwd file",
 			command:   "echo 'test' > /etc/passwd",
 			wantError: true,
-			reason:    "覆盖系统密码文件",
+			reason:    "Overwrite system password file",
 		},
 		{
-			name:      "覆盖shadow文件",
+			name:      "Overwrite shadow file",
 			command:   "cat data > /etc/shadow",
 			wantError: true,
-			reason:    "覆盖系统影子文件",
+			reason:    "Overwrite system shadow file",
 		},
 		// dd 操作
 		{
-			name:      "dd写入零",
+			name:      "dd write zeros",
 			command:   "dd if=/dev/zero of=/dev/sda",
 			wantError: true,
-			reason:    "危险的 dd 操作",
+			reason:    "Dangerous dd operation",
 		},
 		{
-			name:      "dd写入随机数",
+			name:      "dd write random",
 			command:   "dd if=/dev/urandom of=/dev/sda",
 			wantError: true,
-			reason:    "危险的 dd 操作",
+			reason:    "Dangerous dd operation",
 		},
 		// 安全命令
 		{
-			name:      "安全删除tmp文件",
+			name:      "Safe delete tmp files",
 			command:   "rm -rf /tmp/test",
 			wantError: false,
 		},
 		{
-			name:      "普通命令",
+			name:      "Normal command",
 			command:   "uptime",
 			wantError: false,
 		},
 		{
-			name:      "查看系统状态",
+			name:      "Check system status",
 			command:   "sudo systemctl status docker",
 			wantError: false,
 		},
@@ -100,13 +100,13 @@ func TestValidateCommand_DangerousKeywords(t *testing.T) {
 			err := ValidateCommand(tt.command)
 			if tt.wantError {
 				if err == nil {
-					t.Errorf("validateCommand() 期望错误但没有返回错误, 命令: %s", tt.command)
+					t.Errorf("validateCommand() expected an error but got none, Command: %s", tt.command)
 				} else if tt.reason != "" && !strings.Contains(err.Error(), tt.reason) {
-					t.Errorf("validateCommand() 错误信息不包含预期原因\n期望包含: %s\n实际错误: %s", tt.reason, err.Error())
+					t.Errorf("validateCommand() error message does not contain expected reason\nExpected to contain: %s\nActual error: %s", tt.reason, err.Error())
 				}
 			} else {
 				if err != nil {
-					t.Errorf("validateCommand() 不应该返回错误, 命令: %s\n错误: %v", tt.command, err)
+					t.Errorf("validateCommand() should not return an error, Command: %s\nError: %v", tt.command, err)
 				}
 			}
 		})
@@ -126,146 +126,146 @@ func TestValidateCommand_DangerousPatterns(t *testing.T) {
 			name:      "mkfs.ext4",
 			command:   "sudo mkfs.ext4 /dev/sda1",
 			wantError: true,
-			reason:    "格式化文件系统",
+			reason:    "Format filesystem",
 		},
 		{
 			name:      "mkfs ext4",
 			command:   "mkfs -t ext4 /dev/sda1",
 			wantError: true,
-			reason:    "格式化文件系统",
+			reason:    "Format filesystem",
 		},
 		{
 			name:      "mkfs xfs",
 			command:   "sudo mkfs -t xfs /dev/sdb1",
 			wantError: true,
-			reason:    "格式化文件系统",
+			reason:    "Format filesystem",
 		},
 		// 分区操作
 		{
-			name:      "fdisk分区",
+			name:      "fdisk partition",
 			command:   "sudo fdisk /dev/sda",
 			wantError: true,
-			reason:    "磁盘分区操作",
+			reason:    "Disk partition operation",
 		},
 		{
-			name:      "parted分区",
+			name:      "parted partition",
 			command:   "parted /dev/sdb",
 			wantError: true,
-			reason:    "磁盘分区操作",
+			reason:    "Disk partition operation",
 		},
 		{
-			name:      "创建交换分区",
+			name:      "Create swap partition",
 			command:   "mkswap /dev/sda2",
 			wantError: true,
-			reason:    "创建交换分区",
+			reason:    "Create swap partition",
 		},
-		// 关机重启
+		// Shutdown/reboot
 		{
-			name:      "shutdown命令",
+			name:      "shutdown command",
 			command:   "sudo shutdown -h now",
 			wantError: true,
-			reason:    "系统关机操作",
+			reason:    "System shutdown operation",
 		},
 		{
-			name:      "halt命令",
+			name:      "halt command",
 			command:   "sudo halt",
 			wantError: true,
-			reason:    "系统停机操作",
+			reason:    "System halt operation",
 		},
 		{
-			name:      "poweroff命令",
+			name:      "poweroff command",
 			command:   "poweroff",
 			wantError: true,
-			reason:    "系统关机操作",
+			reason:    "System poweroff operation",
 		},
 		{
-			name:      "reboot命令",
+			name:      "reboot command",
 			command:   "sudo reboot",
 			wantError: true,
-			reason:    "系统重启操作",
+			reason:    "System reboot operation",
 		},
 		{
 			name:      "init 0",
 			command:   "init 0",
 			wantError: true,
-			reason:    "系统关机 (init 0)",
+			reason:    "System shutdown (init 0)",
 		},
 		{
 			name:      "init 6",
 			command:   "init 6",
 			wantError: true,
-			reason:    "系统重启 (init 6)",
+			reason:    "System reboot (init 6)",
 		},
 		{
 			name:      "systemctl halt",
 			command:   "systemctl halt",
 			wantError: true,
-			reason:    "系统停机操作",
+			reason:    "System halt operation",
 		},
 		{
 			name:      "systemctl poweroff",
 			command:   "sudo systemctl poweroff",
 			wantError: true,
-			reason:    "系统关机操作",
+			reason:    "System poweroff operation",
 		},
 		{
 			name:      "systemctl reboot",
 			command:   "systemctl reboot",
 			wantError: true,
-			reason:    "系统重启操作",
+			reason:    "System reboot operation",
 		},
-		// 危险的管道操作
+		// Dangerous pipe operations
 		{
-			name:      "curl管道sh",
+			name:      "curl pipe sh",
 			command:   "curl http://example.com/script.sh | sh",
 			wantError: true,
-			reason:    "从网络下载并执行脚本",
+			reason:    "Download and execute script from network",
 		},
 		{
-			name:      "curl管道bash",
+			name:      "curl pipe bash",
 			command:   "curl https://get.docker.com | bash",
 			wantError: true,
-			reason:    "从网络下载并执行脚本",
+			reason:    "Download and execute script from network",
 		},
 		{
-			name:      "wget管道sh",
+			name:      "wget pipe sh",
 			command:   "wget -O- http://example.com/install.sh | sh",
 			wantError: true,
-			reason:    "从网络下载并执行脚本",
+			reason:    "Download and execute script from network",
 		},
 		{
-			name:      "curl管道sh无空格",
+			name:      "curl pipe sh no space",
 			command:   "curl http://example.com/script.sh|sh",
 			wantError: true,
-			reason:    "从网络下载并执行脚本",
+			reason:    "Download and execute script from network",
 		},
-		// 危险的权限设置
+		// Dangerous permission settings
 		{
-			name:      "chmod 777根目录",
+			name:      "chmod 777 root",
 			command:   "chmod 777 /",
 			wantError: true,
-			reason:    "设置根目录权限为 777",
+			reason:    "Set root directory permissions to 777",
 		},
 		{
-			name:      "chmod递归777根目录",
+			name:      "chmod recursive 777 root",
 			command:   "chmod -R 777 /",
 			wantError: true,
-			reason:    "777", // 简化匹配，只检查是否包含777
+			reason:    "777", // Simplified match, just check if contains 777
 		},
-		// 防火墙清空
+		// Firewall flush
 		{
-			name:      "iptables清空",
+			name:      "iptables flush",
 			command:   "iptables -F",
 			wantError: true,
-			reason:    "清空防火墙规则",
+			reason:    "Flush firewall rules",
 		},
 		{
-			name:      "iptables删除链",
+			name:      "iptables delete chain",
 			command:   "iptables -X",
 			wantError: true,
-			reason:    "删除防火墙链",
+			reason:    "Delete firewall chain",
 		},
-		// 安全的systemctl命令
+		// Safe systemctl commands
 		{
 			name:      "systemctl status",
 			command:   "systemctl status nginx",
@@ -277,18 +277,18 @@ func TestValidateCommand_DangerousPatterns(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name:      "systemctl restart服务",
+			name:      "systemctl restart service",
 			command:   "systemctl restart nginx",
 			wantError: false,
 		},
-		// 安全的curl命令
+		// Safe curl commands
 		{
-			name:      "curl下载文件",
+			name:      "curl download file",
 			command:   "curl -O https://example.com/file.tar.gz",
 			wantError: false,
 		},
 		{
-			name:      "curl查看内容",
+			name:      "curl view content",
 			command:   "curl https://api.example.com/status",
 			wantError: false,
 		},
@@ -299,42 +299,42 @@ func TestValidateCommand_DangerousPatterns(t *testing.T) {
 			err := ValidateCommand(tt.command)
 			if tt.wantError {
 				if err == nil {
-					t.Errorf("validateCommand() 期望错误但没有返回错误, 命令: %s", tt.command)
+					t.Errorf("validateCommand() expected an error but got none, Command: %s", tt.command)
 				} else if tt.reason != "" && !strings.Contains(err.Error(), tt.reason) {
-					t.Errorf("validateCommand() 错误信息不包含预期原因\n期望包含: %s\n实际错误: %s", tt.reason, err.Error())
+					t.Errorf("validateCommand() error message does not contain expected reason\nExpected to contain: %s\nActual error: %s", tt.reason, err.Error())
 				}
 			} else {
 				if err != nil {
-					t.Errorf("validateCommand() 不应该返回错误, 命令: %s\n错误: %v", tt.command, err)
+					t.Errorf("validateCommand() should not return an error, Command: %s\nError: %v", tt.command, err)
 				}
 			}
 		})
 	}
 }
 
-// TestValidateCommand_CaseSensitivity 测试大小写不敏感
+// TestValidateCommand_CaseSensitivity tests case insensitivity
 func TestValidateCommand_CaseSensitivity(t *testing.T) {
 	tests := []struct {
 		name    string
 		command string
 	}{
-		{"大写RM", "RM -RF /"},
-		{"混合大小写", "Sudo Rm -Rf /"},
-		{"大写SHUTDOWN", "SHUTDOWN -h now"},
-		{"大写REBOOT", "REBOOT"},
+		{"Uppercase RM", "RM -RF /"},
+		{"Mixed case", "Sudo Rm -Rf /"},
+		{"Uppercase SHUTDOWN", "SHUTDOWN -h now"},
+		{"Uppercase REBOOT", "REBOOT"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateCommand(tt.command)
 			if err == nil {
-				t.Errorf("validateCommand() 应该拦截大小写变体的危险命令: %s", tt.command)
+				t.Errorf("validateCommand() should block case variant of dangerous Command: %s", tt.command)
 			}
 		})
 	}
 }
 
-// TestValidateCommand_EdgeCases 测试边界情况
+// TestValidateCommand_EdgeCases tests edge cases
 func TestValidateCommand_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -342,37 +342,37 @@ func TestValidateCommand_EdgeCases(t *testing.T) {
 		wantError bool
 	}{
 		{
-			name:      "空命令",
+			name:      "Empty command",
 			command:   "",
 			wantError: false,
 		},
 		{
-			name:      "空格命令",
+			name:      "Whitespace command",
 			command:   "   ",
 			wantError: false,
 		},
 		{
-			name:      "单个字符",
+			name:      "Single character",
 			command:   "a",
 			wantError: false,
 		},
 		{
-			name:      "删除/tmp目录（安全）",
+			name:      "Delete /tmp directory (safe)",
 			command:   "rm -rf /tmp/testdir",
 			wantError: false,
 		},
 		{
-			name:      "删除/var/tmp（安全）",
+			name:      "Delete /var/tmp (safe)",
 			command:   "rm -rf /var/tmp/cache",
 			wantError: false,
 		},
 		{
-			name:      "包含/但不是根目录",
+			name:      "Contains / but not root",
 			command:   "rm -rf /home/user/test",
 			wantError: false,
 		},
 		{
-			name:      "systemctl restart而非reboot",
+			name:      "systemctl restart not reboot",
 			command:   "systemctl restart myservice",
 			wantError: false,
 		},
@@ -382,16 +382,16 @@ func TestValidateCommand_EdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateCommand(tt.command)
 			if tt.wantError && err == nil {
-				t.Errorf("validateCommand() 期望错误但没有返回, 命令: %s", tt.command)
+				t.Errorf("validateCommand() expected error but got none, Command: %s", tt.command)
 			}
 			if !tt.wantError && err != nil {
-				t.Errorf("validateCommand() 不应该返回错误, 命令: %s\n错误: %v", tt.command, err)
+				t.Errorf("validateCommand() should not return an error, Command: %s\nError: %v", tt.command, err)
 			}
 		})
 	}
 }
 
-// TestValidateCommand_ErrorMessage 测试错误信息格式
+// TestValidateCommand_ErrorMessage tests error message format
 func TestValidateCommand_ErrorMessage(t *testing.T) {
 	command := "sudo rm -rf /"
 	err := ValidateCommand(command)
@@ -402,23 +402,23 @@ func TestValidateCommand_ErrorMessage(t *testing.T) {
 
 	errMsg := err.Error()
 
-	// 检查错误信息是否包含必要元素
+	// Check if error message contains necessary elements
 	expectedParts := []string{
-		"⚠️",      // 警告图标
-		"危险命令被拦截", // 标题
-		command,   // 命令本身
-		"原因:",     // 原因标签
-		"--force", // 绕过提示
+		"⚠️",                // Warning icon
+		"Dangerous command", // Title
+		command,             // Command itself
+		"Reason:",           // Reason label
+		"--force",           // Bypass hint
 	}
 
 	for _, part := range expectedParts {
 		if !strings.Contains(errMsg, part) {
-			t.Errorf("错误信息应该包含 '%s'\n实际错误信息: %s", part, errMsg)
+			t.Errorf("Error message should contain '%s'\nActual error message: %s", part, errMsg)
 		}
 	}
 }
 
-// BenchmarkValidateCommand 性能基准测试
+// BenchmarkValidateCommand performance benchmark
 func BenchmarkValidateCommand(b *testing.B) {
 	testCases := []string{
 		"uptime",
@@ -436,7 +436,7 @@ func BenchmarkValidateCommand(b *testing.B) {
 	}
 }
 
-// BenchmarkValidateCommand_Safe 安全命令性能测试
+// BenchmarkValidateCommand_Safe safe command performance test
 func BenchmarkValidateCommand_Safe(b *testing.B) {
 	cmd := "sudo systemctl status nginx"
 	b.ResetTimer()
@@ -445,7 +445,7 @@ func BenchmarkValidateCommand_Safe(b *testing.B) {
 	}
 }
 
-// BenchmarkValidateCommand_Dangerous 危险命令性能测试
+// BenchmarkValidateCommand_Dangerous dangerous command performance test
 func BenchmarkValidateCommand_Dangerous(b *testing.B) {
 	cmd := "sudo rm -rf /"
 	b.ResetTimer()

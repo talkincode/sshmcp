@@ -8,17 +8,17 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// ConnectionPool SSH连接池
+// ConnectionPool manages SSH connections with pooling and health checks
 type ConnectionPool struct {
 	mu          sync.RWMutex
 	connections map[string]*PooledConnection
-	maxIdle     time.Duration // 最大空闲时间
-	healthCheck time.Duration // 健康检查间隔
-	maxRetries  int           // 最大重试次数
-	retryDelay  time.Duration // 重试延迟
+	maxIdle     time.Duration // Maximum idle time
+	healthCheck time.Duration // Health check interval
+	maxRetries  int           // Maximum retry attempts
+	retryDelay  time.Duration // Retry delay
 }
 
-// PooledConnection 池化的连接
+// PooledConnection represents a pooled SSH connection
 type PooledConnection struct {
 	client     *ssh.Client
 	config     *Config
@@ -33,28 +33,28 @@ var (
 	globalPoolOnce sync.Once
 )
 
-// GetConnectionPool 获取全局连接池（单例）
+// GetConnectionPool returns the global connection pool singleton
 func GetConnectionPool() *ConnectionPool {
 	globalPoolOnce.Do(func() {
 		globalPool = NewConnectionPool()
-		// 启动后台健康检查和清理
+		// Start background health check and cleanup
 		go globalPool.startMaintenance()
 	})
 	return globalPool
 }
 
-// NewConnectionPool 创建连接池
+// NewConnectionPool creates a new connection pool
 func NewConnectionPool() *ConnectionPool {
 	return &ConnectionPool{
 		connections: make(map[string]*PooledConnection),
-		maxIdle:     5 * time.Minute,  // 5分钟无使用自动关闭
-		healthCheck: 30 * time.Second, // 30秒健康检查
-		maxRetries:  3,                // 最大重试3次
-		retryDelay:  1 * time.Second,  // 重试延迟1秒
+		maxIdle:     5 * time.Minute,  // Auto-close after 5 minutes of inactivity
+		healthCheck: 30 * time.Second, // Health check every 30 seconds
+		maxRetries:  3,                // Maximum 3 retry attempts
+		retryDelay:  1 * time.Second,  // 1 second retry delay
 	}
 }
 
-// GetConnection 从连接池获取或创建连接
+// GetConnection retrieves or creates a connection from the pool
 func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 	key := p.makeKey(config)
 
@@ -62,30 +62,30 @@ func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 	pooledConn, exists := p.connections[key]
 
 	if exists {
-		// 检查连接是否还有效
+		// Check if connection is still valid
 		if p.isConnectionAlive(pooledConn.client) {
 			pooledConn.mu.Lock()
 			pooledConn.lastUsed = time.Now()
 			pooledConn.inUse = true
-			pooledConn.retryCount = 0 // 重置重试计数
+			pooledConn.retryCount = 0 // Reset retry count
 			pooledConn.mu.Unlock()
 			p.mu.Unlock()
 			return pooledConn.client, nil
 		}
 
-		// 连接失效，移除并重新创建
+		// Connection is invalid, remove and recreate
 		pooledConn.client.Close()
 		delete(p.connections, key)
 	}
 	p.mu.Unlock()
 
-	// 创建新连接（带重试机制）
+	// Create new connection with retry mechanism
 	client, err := p.createConnectionWithRetry(config)
 	if err != nil {
 		return nil, err
 	}
 
-	// 添加到连接池
+	// Add to connection pool
 	pooledConn = &PooledConnection{
 		client:     client,
 		config:     config,
@@ -101,7 +101,7 @@ func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 	return client, nil
 }
 
-// ReleaseConnection 释放连接回连接池
+// ReleaseConnection releases a connection back to the pool
 func (p *ConnectionPool) ReleaseConnection(config *Config) {
 	key := p.makeKey(config)
 
@@ -117,13 +117,13 @@ func (p *ConnectionPool) ReleaseConnection(config *Config) {
 	}
 }
 
-// createConnectionWithRetry 创建连接（带重试）
+// createConnectionWithRetry creates a connection with retry mechanism
 func (p *ConnectionPool) createConnectionWithRetry(config *Config) (*ssh.Client, error) {
 	var lastErr error
 
 	for i := 0; i < p.maxRetries; i++ {
 		if i > 0 {
-			time.Sleep(p.retryDelay * time.Duration(i)) // 指数退避
+			time.Sleep(p.retryDelay * time.Duration(i)) // Exponential backoff
 		}
 
 		client, err := p.createConnection(config)
@@ -137,14 +137,14 @@ func (p *ConnectionPool) createConnectionWithRetry(config *Config) (*ssh.Client,
 	return nil, fmt.Errorf("failed after %d retries: %w", p.maxRetries, lastErr)
 }
 
-// createConnection 创建单个SSH连接（直接连接，不使用连接池）
+// createConnection creates a single SSH connection (direct connection, not using pool)
 func (p *ConnectionPool) createConnection(config *Config) (*ssh.Client, error) {
 	sshClient, err := NewSSHClient(config)
 	if err != nil {
 		return nil, err
 	}
 
-	// 使用 connectDirect() 避免递归调用连接池
+	// Use connectDirect() to avoid recursive pool calls
 	if err := sshClient.connectDirect(); err != nil {
 		return nil, err
 	}
@@ -152,13 +152,13 @@ func (p *ConnectionPool) createConnection(config *Config) (*ssh.Client, error) {
 	return sshClient.client, nil
 }
 
-// isConnectionAlive 检查连接是否存活
+// isConnectionAlive checks if a connection is alive
 func (p *ConnectionPool) isConnectionAlive(client *ssh.Client) bool {
 	if client == nil {
 		return false
 	}
 
-	// 尝试创建一个session来测试连接
+	// Try to create a session to test the connection
 	session, err := client.NewSession()
 	if err != nil {
 		return false
@@ -168,12 +168,12 @@ func (p *ConnectionPool) isConnectionAlive(client *ssh.Client) bool {
 	return true
 }
 
-// makeKey 生成连接池键
+// makeKey generates a connection pool key
 func (p *ConnectionPool) makeKey(config *Config) string {
 	return fmt.Sprintf("%s@%s:%s", config.User, config.Host, config.Port)
 }
 
-// startMaintenance 启动后台维护任务
+// startMaintenance starts background maintenance tasks
 func (p *ConnectionPool) startMaintenance() {
 	ticker := time.NewTicker(p.healthCheck)
 	defer ticker.Stop()
@@ -183,7 +183,7 @@ func (p *ConnectionPool) startMaintenance() {
 	}
 }
 
-// cleanup 清理过期和失效的连接
+// cleanup removes expired and invalid connections
 func (p *ConnectionPool) cleanup() {
 	now := time.Now()
 	var toRemove []string
@@ -192,11 +192,11 @@ func (p *ConnectionPool) cleanup() {
 	for key, pooledConn := range p.connections {
 		pooledConn.mu.Lock()
 
-		// 检查是否超过最大空闲时间且未在使用
+		// Check if exceeded max idle time and not in use
 		if !pooledConn.inUse && now.Sub(pooledConn.lastUsed) > p.maxIdle {
 			toRemove = append(toRemove, key)
 		} else if !p.isConnectionAlive(pooledConn.client) {
-			// 连接失效
+			// Connection is invalid
 			toRemove = append(toRemove, key)
 		}
 
@@ -204,12 +204,14 @@ func (p *ConnectionPool) cleanup() {
 	}
 	p.mu.RUnlock()
 
-	// 移除失效连接
+	// Remove invalid connections
 	if len(toRemove) > 0 {
 		p.mu.Lock()
 		for _, key := range toRemove {
 			if pooledConn, exists := p.connections[key]; exists {
-				pooledConn.client.Close()
+				if pooledConn.client != nil {
+					pooledConn.client.Close()
+				}
 				delete(p.connections, key)
 			}
 		}
@@ -217,19 +219,21 @@ func (p *ConnectionPool) cleanup() {
 	}
 }
 
-// Close 关闭连接池中的所有连接
+// Close closes all connections in the pool
 func (p *ConnectionPool) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	for _, pooledConn := range p.connections {
-		pooledConn.client.Close()
+		if pooledConn.client != nil {
+			pooledConn.client.Close()
+		}
 	}
 
 	p.connections = make(map[string]*PooledConnection)
 }
 
-// Stats 获取连接池统计信息
+// Stats returns connection pool statistics
 func (p *ConnectionPool) Stats() map[string]interface{} {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

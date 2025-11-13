@@ -72,6 +72,46 @@ func TestHandlePasswordManagement_UnknownAction(t *testing.T) {
 	t.Skip("Requires integration with actual keyring")
 }
 
+func TestSetPassword_EmptyKey(t *testing.T) {
+	err := setPassword("test-service", "", "test-value")
+	if err == nil {
+		t.Error("Expected error when key is empty")
+	}
+	if err != nil && err.Error() != "password key is required" {
+		t.Errorf("Expected 'password key is required' error, got: %v", err)
+	}
+}
+
+func TestGetPassword_EmptyKey(t *testing.T) {
+	err := getPassword("test-service", "")
+	if err == nil {
+		t.Error("Expected error when key is empty")
+	}
+	if err != nil && err.Error() != "password key is required" {
+		t.Errorf("Expected 'password key is required' error, got: %v", err)
+	}
+}
+
+func TestDeletePassword_EmptyKey(t *testing.T) {
+	err := deletePassword("test-service", "")
+	if err == nil {
+		t.Error("Expected error when key is empty")
+	}
+	if err != nil && err.Error() != "password key is required" {
+		t.Errorf("Expected 'password key is required' error, got: %v", err)
+	}
+}
+
+func TestCheckPassword_EmptyKey(t *testing.T) {
+	err := checkPassword("test-service", "")
+	if err == nil {
+		t.Error("Expected error when key is empty")
+	}
+	if err != nil && err.Error() != "password key is required" {
+		t.Errorf("Expected 'password key is required' error, got: %v", err)
+	}
+}
+
 // Integration test examples (these would need actual keyring access):
 //
 // func TestSetPassword_Integration(t *testing.T) {

@@ -62,9 +62,10 @@ func ParseArgs(args []string) *sshclient.Config {
 			config.SftpAction = "download"
 			config.RemotePath = strings.SplitN(arg, "=", 2)[1]
 		case strings.HasPrefix(arg, "--to="):
-			if config.SftpAction == "upload" {
+			switch config.SftpAction {
+			case "upload":
 				config.RemotePath = strings.SplitN(arg, "=", 2)[1]
-			} else if config.SftpAction == "download" {
+			case "download":
 				config.LocalPath = strings.SplitN(arg, "=", 2)[1]
 			}
 		case strings.HasPrefix(arg, "--list="), strings.HasPrefix(arg, "--ls="):
