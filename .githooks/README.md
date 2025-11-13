@@ -27,9 +27,9 @@ Types: feat, fix, docs, style, refactor, perf, test, chore, build, ci
 **Examples:**
 
 ```bash
-git commit -m "feat: 添加 HTTP 代理支持"
-git commit -m "fix(ssh): 修复连接超时问题"
-git commit -m "docs: 更新 README 安装说明"
+git commit -m "feat: add HTTP proxy support"
+git commit -m "fix(ssh): fix connection timeout issue"
+git commit -m "docs: update README installation instructions"
 ```
 
 ### pre-push

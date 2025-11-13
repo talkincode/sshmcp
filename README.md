@@ -35,6 +35,8 @@ Secure SSH & SFTP Client with MCP Protocol Support
 [![Made with Go](https://img.shields.io/badge/Made%20with-Go-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://github.com/talkincode/sshmcp/pulls)
 
+English | [简体中文](./README_CN.md)
+
 </div>
 
 ---

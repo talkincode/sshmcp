@@ -1,22 +1,22 @@
 #!/bin/bash
 
-# 颜色定义
+# Color definitions
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🏷️  开始获取最新标签...${NC}"
+echo -e "${BLUE}🏷️  Starting to fetch latest tag...${NC}"
 
-# 获取最新标签
+# Fetch latest tags
 git fetch --tags
 
-# 如果没有标签，返回 v0.0.0 作为兜底
+# If no tags exist, return v0.0.0 as fallback
 latest_tag=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "v0.0.0")
 echo -e "${YELLOW}📋 Latest tag: ${latest_tag}${NC}"
 
-# 解析版本号
+# Parse version number
 version=${latest_tag#v}
 IFS='.' read -r -a parts <<<"$version"
 last_idx=$((${#parts[@]} - 1))
@@ -26,32 +26,32 @@ new_tag="v$new_version"
 
 echo -e "${GREEN}🎯 New tag: ${new_tag}${NC}"
 
-# 生成提交记录清单
-echo -e "${BLUE}📝 生成提交记录清单...${NC}"
+# Generate commit log
+echo -e "${BLUE}📝 Generating commit log...${NC}"
 
-# 获取从上一个标签到当前HEAD的提交记录
+# Get commits from last tag to current HEAD
 if [ "$latest_tag" = "v0.0.0" ]; then
-    # 如果没有之前的标签，获取所有提交
+    # If no previous tag, get all commits
     commit_range="HEAD"
-    echo -e "${YELLOW}💡 没有找到之前的标签，将包含所有提交记录${NC}"
+    echo -e "${YELLOW}💡 No previous tag found, will include all commits${NC}"
 else
-    # 从上一个标签到当前HEAD的提交
+    # Commits from last tag to current HEAD
     commit_range="${latest_tag}..HEAD"
-    echo -e "${YELLOW}📊 获取从 ${latest_tag} 到当前的提交记录${NC}"
+    echo -e "${YELLOW}📊 Getting commits from ${latest_tag} to current${NC}"
 fi
 
-# 生成提交记录清单，格式：- [commit_hash] commit_message
+# Generate commit log, format: - [commit_hash] commit_message
 commit_log=$(git log $commit_range --pretty=format:"- [%h] %s" --reverse)
 
 if [ -z "$commit_log" ]; then
-    echo -e "${YELLOW}⚠️  没有找到新的提交记录${NC}"
+    echo -e "${YELLOW}⚠️  No new commits found${NC}"
     tag_message="Release ${new_tag}"
 else
-    echo -e "${GREEN}📋 提交记录清单:${NC}"
+    echo -e "${GREEN}📋 Commit log:${NC}"
     echo "$commit_log"
     echo ""
 
-    # 构建标签消息
+    # Build tag message
     tag_message="Release ${new_tag}
 
 ## Changes since ${latest_tag}
@@ -59,21 +59,21 @@ else
 $commit_log"
 fi
 
-# 确认创建标签
-echo -e -n "${YELLOW}确认创建标签 ${new_tag}? (y/n): ${NC}"
+# Confirm tag creation
+echo -e -n "${YELLOW}Confirm creating tag ${new_tag}? (y/n): ${NC}"
 read confirm
 
 if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-    echo -e "${BLUE}🚀 创建带描述的标签 ${new_tag}...${NC}"
+    echo -e "${BLUE}🚀 Creating annotated tag ${new_tag}...${NC}"
 
-    # 使用 -a 参数创建带注释的标签，-m 参数添加消息
+    # Use -a parameter to create annotated tag, -m parameter to add message
     git tag -a $new_tag -m "$tag_message"
 
-    echo -e "${BLUE}📤 推送标签到远程仓库...${NC}"
+    echo -e "${BLUE}📤 Pushing tag to remote repository...${NC}"
     git push origin $new_tag
 
-    echo -e "${GREEN}✅ 标签 ${new_tag} 创建并推送成功！${NC}"
-    echo -e "${GREEN}📄 标签描述已包含 $(echo "$commit_log" | wc -l | tr -d ' ') 个提交记录${NC}"
+    echo -e "${GREEN}✅ Tag ${new_tag} created and pushed successfully!${NC}"
+    echo -e "${GREEN}📄 Tag description includes $(echo "$commit_log" | wc -l | tr -d ' ') commits${NC}"
 else
-    echo -e "${RED}❌ 标签创建已取消${NC}"
+    echo -e "${RED}❌ Tag creation cancelled${NC}"
 fi

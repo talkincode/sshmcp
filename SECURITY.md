@@ -19,6 +19,7 @@ We appreciate your efforts to responsibly disclose your findings and will make e
 If you discover a security vulnerability in SSHMCP, please report it by **one** of the following methods:
 
 1. **GitHub Security Advisories** (Recommended)
+
    - Navigate to the [Security tab](https://github.com/talkincode/sshmcp/security/advisories)
    - Click "Report a vulnerability"
    - Fill in the details of the vulnerability
