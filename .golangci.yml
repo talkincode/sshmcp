@@ -20,6 +20,7 @@ linters:
     - copyloopvar
     - noctx
     - gosec
+    - gofmt
 
   settings:
     errcheck:
@@ -30,18 +31,8 @@ linters:
       enable:
         - shadow
 
-    gofmt:
-      simplify: true
-
     misspell:
       locale: US
 
     nakedret:
       max-func-lines: 30
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
