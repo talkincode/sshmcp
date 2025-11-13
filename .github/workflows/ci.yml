@@ -92,23 +92,34 @@ jobs:
         if: always()
         run: |
           if [ -f results.sarif ]; then
+            # Ensure we have write permissions
+            chmod +w results.sarif || true
+
+            # Fix SARIF format using Python
             python3 << 'EOF'
           import json
+          import sys
 
-          with open('results.sarif', 'r') as f:
-              data = json.load(f)
+          try:
+              with open('results.sarif', 'r') as f:
+                  data = json.load(f)
 
-          # Fix artifactChanges to be arrays
-          for run in data.get('runs', []):
-              for result in run.get('results', []):
-                  for fix in result.get('fixes', []):
-                      if 'artifactChanges' in fix:
-                          # If artifactChanges is not a list, wrap it in a list
-                          if not isinstance(fix['artifactChanges'], list):
-                              fix['artifactChanges'] = [fix['artifactChanges']]
+              # Fix artifactChanges to be arrays
+              for run in data.get('runs', []):
+                  for result in run.get('results', []):
+                      for fix in result.get('fixes', []):
+                          if 'artifactChanges' in fix:
+                              # If artifactChanges is not a list, wrap it in a list
+                              if not isinstance(fix['artifactChanges'], list):
+                                  fix['artifactChanges'] = [fix['artifactChanges']]
 
-          with open('results.sarif', 'w') as f:
-              json.dump(data, f, indent=2)
+              with open('results.sarif', 'w') as f:
+                  json.dump(data, f, indent=2)
+
+              print("✓ SARIF file format fixed successfully")
+          except Exception as e:
+              print(f"Warning: Failed to fix SARIF format: {e}", file=sys.stderr)
+              sys.exit(0)  # Don't fail the workflow
           EOF
           fi
 
