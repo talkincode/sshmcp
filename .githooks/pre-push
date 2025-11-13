@@ -1,0 +1,65 @@
+#!/bin/bash
+# Pre-push hook to run comprehensive checks before pushing
+
+set -e
+
+echo "🚀 Running pre-push checks..."
+echo ""
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+print_status() {
+    echo -e "${BLUE}➜${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+# 1. Run all tests with coverage
+print_status "Running tests with coverage..."
+if ! go test -v -race -coverprofile=coverage.out -covermode=atomic ./...; then
+    print_error "Tests failed"
+    exit 1
+fi
+print_success "All tests passed with race detection"
+echo ""
+
+# 2. Check test coverage
+print_status "Checking test coverage..."
+coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+if (( $(echo "$coverage < 50" | bc -l) )); then
+    print_error "Test coverage is below 50% (current: ${coverage}%)"
+    print_warning "Please add more tests before pushing"
+    exit 1
+fi
+print_success "Test coverage: ${coverage}%"
+echo ""
+
+# 3. Build for all platforms
+print_status "Building for all platforms..."
+if ! make build-all > /dev/null 2>&1; then
+    print_error "Cross-platform build failed"
+    exit 1
+fi
+print_success "All platform builds successful"
+echo ""
+
+# 4. Clean up
+rm -f coverage.out
+
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo -e "${GREEN}✓ All pre-push checks passed!${NC}"
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo ""
+
+exit 0

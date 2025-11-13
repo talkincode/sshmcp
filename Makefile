@@ -182,6 +182,10 @@ info: ## Show project information
 	@find . -name "*.go" -not -path "./vendor/*" | wc -l | awk '{print "  Go files: " $$1}'
 	@find . -name "*_test.go" -not -path "./vendor/*" | wc -l | awk '{print "  Test files: " $$1}'
 
+setup-hooks: ## Install Git hooks for pre-commit checks
+	@echo "Installing Git hooks..."
+	@./scripts/setup-hooks.sh
+
 watch: ## Watch file changes and auto-test (requires entr)
 	@echo "Watching file changes..."
 	@which entr > /dev/null || (echo "Please install entr first: brew install entr (macOS) or apt-get install entr (Linux)" && exit 1)

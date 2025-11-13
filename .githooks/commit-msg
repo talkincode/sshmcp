@@ -1,0 +1,60 @@
+#!/bin/bash
+# Commit message hook to enforce conventional commit format
+# Format: <type>(<scope>): <subject>
+# Types: feat, fix, docs, style, refactor, test, chore
+
+set -e
+
+commit_msg_file=$1
+commit_msg=$(cat "$commit_msg_file")
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Skip merge commits
+if echo "$commit_msg" | grep -qE "^Merge "; then
+    exit 0
+fi
+
+# Conventional commit pattern
+pattern='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\(.+\))?: .{1,72}'
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+    echo -e "${RED}✗ Invalid commit message format${NC}"
+    echo ""
+    echo "Commit message should follow conventional commits format:"
+    echo ""
+    echo -e "${GREEN}Format:${NC}"
+    echo "  <type>(<scope>): <subject>"
+    echo ""
+    echo -e "${GREEN}Types:${NC}"
+    echo "  feat:     新功能"
+    echo "  fix:      Bug 修复"
+    echo "  docs:     文档更新"
+    echo "  style:    代码格式化"
+    echo "  refactor: 重构"
+    echo "  perf:     性能优化"
+    echo "  test:     测试相关"
+    echo "  chore:    构建/工具链"
+    echo "  build:    构建系统"
+    echo "  ci:       CI 配置"
+    echo ""
+    echo -e "${GREEN}Examples:${NC}"
+    echo "  feat: 添加代理支持"
+    echo "  feat(ssh): 添加 HTTP 代理支持"
+    echo "  fix: 修复连接池内存泄漏"
+    echo "  fix(mcp): 修复工具调用错误"
+    echo "  docs: 更新 README 安装说明"
+    echo ""
+    echo -e "${YELLOW}Your commit message:${NC}"
+    echo "$commit_msg"
+    echo ""
+    echo -e "${YELLOW}Tip:${NC} Use 'git commit --amend' to fix your commit message"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Commit message format valid${NC}"
+exit 0

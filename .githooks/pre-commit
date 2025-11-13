@@ -1,0 +1,115 @@
+#!/bin/bash
+# Pre-commit hook to ensure code quality before commit
+# This hook runs tests, formatting, and linting checks
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+echo ""
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Check if we're in a git repository
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo -e "${RED}✗${NC} Not in a git repository"
+    exit 1
+fi
+
+# Function to print status
+print_status() {
+    echo -e "${BLUE}➜${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+# 1. Check for Go installation
+print_status "Checking Go installation..."
+if ! command -v go &> /dev/null; then
+    print_error "Go is not installed"
+    exit 1
+fi
+print_success "Go is installed: $(go version)"
+echo ""
+
+# 2. Format code
+print_status "Running go fmt..."
+if ! gofmt -l -w .; then
+    print_error "go fmt failed"
+    exit 1
+fi
+print_success "Code formatting complete"
+echo ""
+
+# 3. Run go vet
+print_status "Running go vet..."
+if ! go vet ./...; then
+    print_error "go vet found issues"
+    exit 1
+fi
+print_success "go vet passed"
+echo ""
+
+# 4. Run tests
+print_status "Running tests..."
+if ! go test -v ./...; then
+    print_error "Tests failed"
+    echo ""
+    print_warning "Tip: Run 'make test' to see detailed test output"
+    exit 1
+fi
+print_success "All tests passed"
+echo ""
+
+# 5. Build check
+print_status "Running build check..."
+if ! go build -o /tmp/sshx-test ./cmd/sshx; then
+    print_error "Build failed"
+    exit 1
+fi
+rm -f /tmp/sshx-test
+print_success "Build successful"
+echo ""
+
+# 6. Check for golangci-lint (optional but recommended)
+if command -v golangci-lint &> /dev/null; then
+    print_status "Running golangci-lint..."
+    if ! golangci-lint run --timeout=5m ./...; then
+        print_error "golangci-lint found issues"
+        print_warning "Note: You can skip this with 'git commit --no-verify' (not recommended)"
+        exit 1
+    fi
+    print_success "golangci-lint passed"
+    echo ""
+else
+    print_warning "golangci-lint not found (optional but recommended)"
+    print_warning "Install with: brew install golangci-lint (macOS) or see https://golangci-lint.run/usage/install/"
+    echo ""
+fi
+
+# 7. Add formatted files to staging
+print_status "Adding formatted files to staging..."
+git add -u
+print_success "Staged formatted files"
+echo ""
+
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo -e "${GREEN}✓ All pre-commit checks passed!${NC}"
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo ""
+
+exit 0
