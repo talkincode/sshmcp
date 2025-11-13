@@ -88,6 +88,30 @@ jobs:
         with:
           args: "-no-fail -fmt sarif -out results.sarif ./..."
 
+      - name: Fix SARIF file format
+        if: always()
+        run: |
+          if [ -f results.sarif ]; then
+            python3 << 'EOF'
+          import json
+
+          with open('results.sarif', 'r') as f:
+              data = json.load(f)
+
+          # Fix artifactChanges to be arrays
+          for run in data.get('runs', []):
+              for result in run.get('results', []):
+                  for fix in result.get('fixes', []):
+                      if 'artifactChanges' in fix:
+                          # If artifactChanges is not a list, wrap it in a list
+                          if not isinstance(fix['artifactChanges'], list):
+                              fix['artifactChanges'] = [fix['artifactChanges']]
+
+          with open('results.sarif', 'w') as f:
+              json.dump(data, f, indent=2)
+          EOF
+          fi
+
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
         with:
