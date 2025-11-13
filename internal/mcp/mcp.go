@@ -512,7 +512,9 @@ func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interfa
 	// 使用新的 ExecuteCommandWithOutput 方法直接获取输出
 	output, err = client.ExecuteCommandWithOutput()
 	if err != nil {
-		return "", fmt.Errorf("command execution failed: %w", err)
+		// 返回详细的错误信息,包含命令和完整的错误详情
+		return "", fmt.Errorf("failed to execute command '%s' on %s@%s:%s - %w",
+			command, config.User, config.Host, config.Port, err)
 	}
 
 	return output, nil

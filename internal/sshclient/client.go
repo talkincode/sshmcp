@@ -244,23 +244,44 @@ func (c *SSHClient) ExecuteCommandWithOutput() (output string, err error) {
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
+	var execErr error
 	if c.config.Password != "" && strings.Contains(c.config.Command, "sudo") {
 		actualCmd := strings.TrimPrefix(c.config.Command, "sudo ")
 		actualCmd = strings.TrimSpace(actualCmd)
 		finalCmd := fmt.Sprintf(`printf '%%s\n' '%s' | sudo -S %s`, c.config.Password, actualCmd)
 
-		if err := session.Run(finalCmd); err != nil {
-			return "", fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
-		}
+		execErr = session.Run(finalCmd)
 	} else {
-		if err := session.Run(c.config.Command); err != nil {
-			return "", fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
-		}
+		execErr = session.Run(c.config.Command)
 	}
 
+	// Build detailed output regardless of success/failure
 	output = stdout.String()
-	if stderr.Len() > 0 {
-		output += "\n--- STDERR ---\n" + stderr.String()
+	stderrStr := stderr.String()
+
+	if execErr != nil {
+		// Build comprehensive error message
+		errMsg := fmt.Sprintf("command failed: %v", execErr)
+
+		if stderrStr != "" {
+			errMsg += fmt.Sprintf("\nStderr: %s", stderrStr)
+		}
+
+		if output != "" {
+			errMsg += fmt.Sprintf("\nStdout: %s", output)
+		}
+
+		// Include exit code if available
+		if exitErr, ok := execErr.(*ssh.ExitError); ok {
+			errMsg += fmt.Sprintf("\nExit Code: %d", exitErr.ExitStatus())
+		}
+
+		return "", fmt.Errorf("%s", errMsg)
+	}
+
+	// For successful execution, include stderr in output if present
+	if stderrStr != "" {
+		output += "\n--- STDERR ---\n" + stderrStr
 	}
 
 	return output, nil

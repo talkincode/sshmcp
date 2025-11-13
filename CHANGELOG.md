@@ -13,11 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- N/A
+- Enhanced error reporting in MCP mode with detailed diagnostic information
+- Improved `ExecuteCommandWithOutput()` to capture and report comprehensive error details
+  - Now includes full stderr output in error messages
+  - Now includes stdout output when command fails
+  - Now displays process exit codes for better debugging
+  - Provides command and host context in error messages
 
 ### Fixed
 
-- N/A
+- Fixed issue where MCP error messages lacked specific error details (only showed "Process exited with status X")
+- Improved error message formatting to include all available diagnostic information
 
 ## [0.0.7] - 2025-11-13
 
