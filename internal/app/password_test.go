@@ -9,7 +9,7 @@ import (
 func TestIsWindows(t *testing.T) {
 	// Save original env
 	origOS := os.Getenv("OS")
-	defer os.Setenv("OS", origOS)
+	defer func() { _ = os.Setenv("OS", origOS) }()
 
 	tests := []struct {
 		name     string
@@ -24,7 +24,7 @@ func TestIsWindows(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("OS", tt.osEnv)
+			_ = os.Setenv("OS", tt.osEnv)
 			result := isWindows()
 			if result != tt.expected {
 				t.Errorf("isWindows() = %v, expected %v", result, tt.expected)

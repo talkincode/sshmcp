@@ -18,11 +18,11 @@ func TestRun_NoArgs(t *testing.T) {
 	args := []string{"sshx"}
 	err := Run(args)
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 
 	// Should return ErrUsage
 	if !errors.Is(err, ErrUsage) {
@@ -135,12 +135,12 @@ func TestRun_ArgumentParsing(t *testing.T) {
 
 			err := Run(tt.args)
 
-			w.Close()
+			_ = w.Close()
 			os.Stdout = oldStdout
 			os.Stderr = oldStderr
 
 			// Drain pipe
-			io.Copy(io.Discard, r)
+			_, _ = io.Copy(io.Discard, r)
 
 			if tt.shouldError && err == nil {
 				t.Error("Expected error but got nil")

@@ -15,14 +15,14 @@ import (
 // 2. Add execute permission
 // 3. Execute script
 // 4. Clean up temp file
-func (c *SSHClient) ExecuteScript(localScriptPath string) (string, error) {
+func (c *SSHClient) ExecuteScript(localScriptPath string) (output string, err error) {
 	// 1. Check if local script exists
 	if _, err := os.Stat(localScriptPath); err != nil {
 		return "", fmt.Errorf("local script not found: %w", err)
 	}
 
 	// 2. Read script content
-	scriptContent, err := os.ReadFile(localScriptPath)
+	scriptContent, err := os.ReadFile(localScriptPath) //nolint:gosec // G304: script path is provided by user
 	if err != nil {
 		return "", fmt.Errorf("failed to read script: %w", err)
 	}
@@ -39,7 +39,7 @@ func (c *SSHClient) ExecuteScript(localScriptPath string) (string, error) {
 			return "", fmt.Errorf("failed to create SFTP client: %w", sftpErr)
 		}
 		c.sftpClient = sftpClient
-		defer c.sftpClient.Close()
+		defer CloseIgnore(&err, c.sftpClient)
 	}
 
 	// 5. Upload script to remote
@@ -48,11 +48,13 @@ func (c *SSHClient) ExecuteScript(localScriptPath string) (string, error) {
 		return "", fmt.Errorf("failed to create remote file: %w", err)
 	}
 
-	if _, err := remoteFile.Write(scriptContent); err != nil {
-		remoteFile.Close()
+	if _, err = remoteFile.Write(scriptContent); err != nil {
+		_ = remoteFile.Close()
 		return "", fmt.Errorf("failed to write script: %w", err)
 	}
-	remoteFile.Close()
+	if err = remoteFile.Close(); err != nil {
+		return "", fmt.Errorf("failed to close remote file: %w", err)
+	}
 
 	// 6. Add execute permission
 	if err := c.sftpClient.Chmod(remotePath, 0755); err != nil {
@@ -78,12 +80,12 @@ func (c *SSHClient) ExecuteScript(localScriptPath string) (string, error) {
 }
 
 // executeRemoteScript executes a remote script
-func (c *SSHClient) executeRemoteScript(remotePath string) (string, error) {
+func (c *SSHClient) executeRemoteScript(remotePath string) (output string, err error) {
 	session, err := c.client.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer session.Close()
+	defer CloseIgnore(&err, session)
 
 	// Detect script type and execute
 	var command string
@@ -100,30 +102,31 @@ func (c *SSHClient) executeRemoteScript(remotePath string) (string, error) {
 		command = fmt.Sprintf("bash %s", remotePath)
 	}
 
-	output, err := session.CombinedOutput(command)
-	return string(output), err
+	outputBytes, err := session.CombinedOutput(command)
+	output = string(outputBytes)
+	return output, err
 }
 
 // executeSimpleCommand executes a simple command (used for cleanup, etc.)
-func (c *SSHClient) executeSimpleCommand(command string) error {
+func (c *SSHClient) executeSimpleCommand(command string) (err error) {
 	session, err := c.client.NewSession()
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer CloseIgnore(&err, session)
 
 	return session.Run(command)
 }
 
 // ExecuteScriptWithArgs executes a script with arguments
-func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string) (string, error) {
+func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string) (output string, err error) {
 	// 1. Check if local script exists
 	if _, err := os.Stat(localScriptPath); err != nil {
 		return "", fmt.Errorf("local script not found: %w", err)
 	}
 
 	// 2. Read script content
-	scriptContent, err := os.ReadFile(localScriptPath)
+	scriptContent, err := os.ReadFile(localScriptPath) //nolint:gosec // G304: script path is provided by user
 	if err != nil {
 		return "", fmt.Errorf("failed to read script: %w", err)
 	}
@@ -140,7 +143,7 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 			return "", fmt.Errorf("failed to create SFTP client: %w", sftpErr)
 		}
 		c.sftpClient = sftpClient
-		defer c.sftpClient.Close()
+		defer CloseIgnore(&err, c.sftpClient)
 	}
 
 	// 5. Upload script
@@ -148,12 +151,11 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 	if err != nil {
 		return "", fmt.Errorf("failed to create remote file: %w", err)
 	}
+	defer CloseIgnore(&err, remoteFile)
 
 	if _, err = remoteFile.Write(scriptContent); err != nil {
-		remoteFile.Close()
 		return "", fmt.Errorf("failed to write script: %w", err)
 	}
-	remoteFile.Close()
 
 	// 6. Add execute permission
 	if err = c.sftpClient.Chmod(remotePath, 0755); err != nil {
@@ -180,9 +182,10 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 		}
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer session.Close()
+	defer CloseIgnore(&err, session)
 
-	output, execErr := session.CombinedOutput(command)
+	outputBytes, execErr := session.CombinedOutput(command)
+	output = string(outputBytes)
 
 	// 9. Clean up temp file
 	if cleanupErr := c.executeSimpleCommand(fmt.Sprintf("rm -f %s", remotePath)); cleanupErr != nil {
@@ -191,10 +194,10 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 
 	// 10. Return execution result
 	if execErr != nil {
-		return string(output), fmt.Errorf("script execution failed: %w", execErr)
+		return output, fmt.Errorf("script execution failed: %w", execErr)
 	}
 
-	return string(output), nil
+	return output, nil
 }
 
 // detectInterpreter detects the script interpreter

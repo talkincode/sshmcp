@@ -6,5 +6,9 @@
   "yaml.schemaStore.enable": true,
   "files.associations": {
     ".golangci.yml": "yaml"
-  }
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "yaml.customTags": ["!include"]
 }

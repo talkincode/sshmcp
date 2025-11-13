@@ -18,12 +18,12 @@ func TestPrintUsage(t *testing.T) {
 	PrintUsage()
 
 	// Restore stdout
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	// Read captured output
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	// Verify output contains key sections
@@ -114,11 +114,11 @@ func TestPrintUsage_OutputFormat(t *testing.T) {
 
 	PrintUsage()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	// Verify output starts with newline (for proper formatting)
@@ -140,11 +140,11 @@ func TestPrintUsage_Examples(t *testing.T) {
 
 	PrintUsage()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	// Verify practical examples exist

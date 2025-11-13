@@ -460,8 +460,8 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 }
 
 // executeSSH 执行SSH命令
-func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interface{}) (string, error) {
-	// 检查是否为测试调用（使用默认 host）
+func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interface{}) (output string, err error) {
+	// 检查是否为测试调用(使用默认 host)
 	if config.Host == "0.0.0.0" {
 		return "MCP Tool: ssh_execute\nStatus: Ready\nNote: Please provide a valid 'host' parameter to execute SSH commands.\nExample: {\"host\": \"192.168.1.100\", \"command\": \"uptime\"}", nil
 	}
@@ -503,14 +503,14 @@ func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interfa
 	if err != nil {
 		return "", fmt.Errorf("failed to create SSH client: %w", err)
 	}
-	defer client.Close()
+	defer sshclient.CloseIgnore(&err, client)
 
 	if err = client.Connect(); err != nil {
 		return "", fmt.Errorf("failed to connect: %w", err)
 	}
 
 	// 使用新的 ExecuteCommandWithOutput 方法直接获取输出
-	output, err := client.ExecuteCommandWithOutput()
+	output, err = client.ExecuteCommandWithOutput()
 	if err != nil {
 		return "", fmt.Errorf("command execution failed: %w", err)
 	}
@@ -519,7 +519,7 @@ func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interfa
 }
 
 // executeSftpUpload 执行SFTP上传
-func (s *MCPServer) executeSftpUpload(config *sshclient.Config, args map[string]interface{}) (string, error) {
+func (s *MCPServer) executeSftpUpload(config *sshclient.Config, args map[string]interface{}) (result string, err error) {
 	// 检查是否为测试调用
 	if config.Host == "0.0.0.0" {
 		return "MCP Tool: sftp_upload\nStatus: Ready\nNote: Please provide valid parameters to upload files.\nExample: {\"host\": \"192.168.1.100\", \"local_path\": \"/local/file.txt\", \"remote_path\": \"/remote/file.txt\"}", nil
@@ -543,7 +543,7 @@ func (s *MCPServer) executeSftpUpload(config *sshclient.Config, args map[string]
 	if err != nil {
 		return "", err
 	}
-	defer client.Close()
+	defer sshclient.CloseIgnore(&err, client)
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -557,7 +557,7 @@ func (s *MCPServer) executeSftpUpload(config *sshclient.Config, args map[string]
 }
 
 // executeSftpDownload 执行SFTP下载
-func (s *MCPServer) executeSftpDownload(config *sshclient.Config, args map[string]interface{}) (string, error) {
+func (s *MCPServer) executeSftpDownload(config *sshclient.Config, args map[string]interface{}) (result string, err error) {
 	// 检查是否为测试调用
 	if config.Host == "0.0.0.0" {
 		return "MCP Tool: sftp_download\nStatus: Ready\nNote: Please provide valid parameters to download files.\nExample: {\"host\": \"192.168.1.100\", \"remote_path\": \"/remote/file.txt\", \"local_path\": \"/local/file.txt\"}", nil
@@ -581,7 +581,7 @@ func (s *MCPServer) executeSftpDownload(config *sshclient.Config, args map[strin
 	if err != nil {
 		return "", err
 	}
-	defer client.Close()
+	defer sshclient.CloseIgnore(&err, client)
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -595,7 +595,7 @@ func (s *MCPServer) executeSftpDownload(config *sshclient.Config, args map[strin
 }
 
 // executeSftpList 执行SFTP列表
-func (s *MCPServer) executeSftpList(config *sshclient.Config, args map[string]interface{}) (string, error) {
+func (s *MCPServer) executeSftpList(config *sshclient.Config, args map[string]interface{}) (result string, err error) {
 	// 检查是否为测试调用
 	if config.Host == "0.0.0.0" {
 		return "MCP Tool: sftp_list\nStatus: Ready\nNote: Please provide a valid 'host' parameter to list files.\nExample: {\"host\": \"192.168.1.100\", \"remote_path\": \"/var/log\"}", nil
@@ -614,7 +614,7 @@ func (s *MCPServer) executeSftpList(config *sshclient.Config, args map[string]in
 	if err != nil {
 		return "", err
 	}
-	defer client.Close()
+	defer sshclient.CloseIgnore(&err, client)
 
 	if err = client.Connect(); err != nil {
 		return "", err
@@ -642,7 +642,7 @@ func (s *MCPServer) executeSftpList(config *sshclient.Config, args map[string]in
 	}()
 
 	err = <-errChan
-	w.Close()
+	_ = w.Close() // Best-effort close
 	os.Stdout = oldStdout
 
 	if err != nil {
@@ -653,7 +653,7 @@ func (s *MCPServer) executeSftpList(config *sshclient.Config, args map[string]in
 }
 
 // executeSftpMkdir 执行SFTP创建目录
-func (s *MCPServer) executeSftpMkdir(config *sshclient.Config, args map[string]interface{}) (string, error) {
+func (s *MCPServer) executeSftpMkdir(config *sshclient.Config, args map[string]interface{}) (result string, err error) {
 	// 检查是否为测试调用
 	if config.Host == "0.0.0.0" {
 		return "MCP Tool: sftp_mkdir\nStatus: Ready\nNote: Please provide valid parameters to create directories.\nExample: {\"host\": \"192.168.1.100\", \"remote_path\": \"/tmp/newdir\"}", nil
@@ -672,7 +672,7 @@ func (s *MCPServer) executeSftpMkdir(config *sshclient.Config, args map[string]i
 	if err != nil {
 		return "", err
 	}
-	defer client.Close()
+	defer sshclient.CloseIgnore(&err, client)
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -686,7 +686,7 @@ func (s *MCPServer) executeSftpMkdir(config *sshclient.Config, args map[string]i
 }
 
 // executeSftpRemove 执行SFTP删除
-func (s *MCPServer) executeSftpRemove(config *sshclient.Config, args map[string]interface{}) (string, error) {
+func (s *MCPServer) executeSftpRemove(config *sshclient.Config, args map[string]interface{}) (result string, err error) {
 	// 检查是否为测试调用
 	if config.Host == "0.0.0.0" {
 		return "MCP Tool: sftp_remove\nStatus: Ready\nNote: Please provide valid parameters to remove files/directories.\nExample: {\"host\": \"192.168.1.100\", \"remote_path\": \"/tmp/oldfile.txt\"}", nil
@@ -705,7 +705,7 @@ func (s *MCPServer) executeSftpRemove(config *sshclient.Config, args map[string]
 	if err != nil {
 		return "", err
 	}
-	defer client.Close()
+	defer sshclient.CloseIgnore(&err, client)
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -749,11 +749,11 @@ func (s *MCPServer) writeJSON(v interface{}) {
 		// 静默忽略，MCP 模式下不输出日志
 		return
 	}
-	fmt.Fprintf(s.stdout, "%s\n", data)
+	_, _ = fmt.Fprintf(s.stdout, "%s\n", data) // Best-effort write
 }
 
 // executeScript 执行脚本
-func (s *MCPServer) executeScript(config *sshclient.Config, args map[string]interface{}) (string, error) {
+func (s *MCPServer) executeScript(config *sshclient.Config, args map[string]interface{}) (output string, err error) {
 	// 检查是否为测试调用
 	if config.Host == "0.0.0.0" {
 		return "MCP Tool: script_execute\nStatus: Ready\nNote: Please provide valid parameters to execute scripts.\nExample: {\"host\": \"192.168.1.100\", \"script_path\": \"/path/to/script.sh\"}", nil
@@ -768,14 +768,13 @@ func (s *MCPServer) executeScript(config *sshclient.Config, args map[string]inte
 	if err != nil {
 		return "", fmt.Errorf("failed to create SSH client: %w", err)
 	}
-	defer client.Close()
+	defer sshclient.CloseIgnore(&err, client)
 
 	if err = client.Connect(); err != nil {
 		return "", fmt.Errorf("failed to connect: %w", err)
 	}
 
 	// 检查是否有参数
-	var output string
 	if argsStr, ok := args["args"].(string); ok && argsStr != "" {
 		// 分割参数
 		scriptArgs := strings.Fields(argsStr)

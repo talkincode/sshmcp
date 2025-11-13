@@ -317,19 +317,19 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 
 	// Cleanup
 	defer func() {
-		os.Setenv("SSH_PASSWORD", origPassword)
-		os.Setenv("SSH_KEY_PATH", origKeyPath)
-		os.Setenv("SSH_NO_SAFETY_CHECK", origNoSafety)
-		os.Setenv("SSH_FORCE", origForce)
-		os.Setenv("SSH_SUDO_KEY", origSudoKey)
+		_ = os.Setenv("SSH_PASSWORD", origPassword)
+		_ = os.Setenv("SSH_KEY_PATH", origKeyPath)
+		_ = os.Setenv("SSH_NO_SAFETY_CHECK", origNoSafety)
+		_ = os.Setenv("SSH_FORCE", origForce)
+		_ = os.Setenv("SSH_SUDO_KEY", origSudoKey)
 	}()
 
 	// Test password from env
-	os.Setenv("SSH_PASSWORD", "envpass")
-	os.Setenv("SSH_KEY_PATH", "/env/key/path")
-	os.Setenv("SSH_NO_SAFETY_CHECK", "true")
-	os.Setenv("SSH_FORCE", "true")
-	os.Setenv("SSH_SUDO_KEY", "custom-sudo")
+	_ = os.Setenv("SSH_PASSWORD", "envpass")
+	_ = os.Setenv("SSH_KEY_PATH", "/env/key/path")
+	_ = os.Setenv("SSH_NO_SAFETY_CHECK", "true")
+	_ = os.Setenv("SSH_FORCE", "true")
+	_ = os.Setenv("SSH_SUDO_KEY", "custom-sudo")
 
 	args := []string{"sshx", "-h=host", "uptime"}
 	config := ParseArgs(args)
@@ -354,8 +354,8 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 func TestParseArgs_DefaultSudoKey(t *testing.T) {
 	// Clear SSH_SUDO_KEY
 	origSudoKey := os.Getenv("SSH_SUDO_KEY")
-	os.Unsetenv("SSH_SUDO_KEY")
-	defer os.Setenv("SSH_SUDO_KEY", origSudoKey)
+	_ = os.Unsetenv("SSH_SUDO_KEY")
+	defer func() { _ = os.Setenv("SSH_SUDO_KEY", origSudoKey) }()
 
 	args := []string{"sshx", "-h=host", "uptime"}
 	config := ParseArgs(args)

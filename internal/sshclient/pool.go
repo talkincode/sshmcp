@@ -74,7 +74,7 @@ func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 		}
 
 		// Connection is invalid, remove and recreate
-		pooledConn.client.Close()
+		_ = pooledConn.client.Close() // Best-effort close
 		delete(p.connections, key)
 	}
 	p.mu.Unlock()
@@ -163,7 +163,7 @@ func (p *ConnectionPool) isConnectionAlive(client *ssh.Client) bool {
 	if err != nil {
 		return false
 	}
-	session.Close()
+	_ = session.Close() // Best-effort close
 
 	return true
 }
@@ -210,7 +210,7 @@ func (p *ConnectionPool) cleanup() {
 		for _, key := range toRemove {
 			if pooledConn, exists := p.connections[key]; exists {
 				if pooledConn.client != nil {
-					pooledConn.client.Close()
+					_ = pooledConn.client.Close() // Best-effort close
 				}
 				delete(p.connections, key)
 			}
@@ -226,7 +226,7 @@ func (p *ConnectionPool) Close() {
 
 	for _, pooledConn := range p.connections {
 		if pooledConn.client != nil {
-			pooledConn.client.Close()
+			_ = pooledConn.client.Close() // Best-effort close
 		}
 	}
 

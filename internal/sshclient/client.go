@@ -161,7 +161,7 @@ func (c *SSHClient) connectDirect() error {
 			}
 		}
 
-		if key, err := os.ReadFile(keyPath); err == nil {
+		if key, err := os.ReadFile(keyPath); err == nil { //nolint:gosec // G304: key path is provided by user
 			signer, signerErr := ssh.ParsePrivateKey(key)
 			if signerErr == nil {
 				authMethods = append(authMethods, ssh.PublicKeys(signer))
@@ -204,7 +204,7 @@ func (c *SSHClient) connectDirect() error {
 }
 
 // ExecuteCommand executes a command
-func (c *SSHClient) ExecuteCommand() error {
+func (c *SSHClient) ExecuteCommand() (err error) {
 	if c.config.SafetyCheck && !c.config.Force {
 		if err := ValidateCommand(c.config.Command); err != nil {
 			return err
@@ -217,7 +217,7 @@ func (c *SSHClient) ExecuteCommand() error {
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
-	defer session.Close()
+	defer CloseIgnore(&err, session)
 
 	if c.config.Password != "" && strings.Contains(c.config.Command, "sudo") {
 		return c.executeInteractive(session)
@@ -227,7 +227,7 @@ func (c *SSHClient) ExecuteCommand() error {
 }
 
 // ExecuteCommandWithOutput executes a command and returns the output
-func (c *SSHClient) ExecuteCommandWithOutput() (string, error) {
+func (c *SSHClient) ExecuteCommandWithOutput() (output string, err error) {
 	if c.config.SafetyCheck && !c.config.Force {
 		if err := ValidateCommand(c.config.Command); err != nil {
 			return "", err
@@ -238,7 +238,7 @@ func (c *SSHClient) ExecuteCommandWithOutput() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer session.Close()
+	defer CloseIgnore(&err, session)
 
 	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout
@@ -258,7 +258,7 @@ func (c *SSHClient) ExecuteCommandWithOutput() (string, error) {
 		}
 	}
 
-	output := stdout.String()
+	output = stdout.String()
 	if stderr.Len() > 0 {
 		output += "\n--- STDERR ---\n" + stderr.String()
 	}
@@ -363,12 +363,12 @@ func (c *SSHClient) executeInteractive(session *ssh.Session) error {
 }
 
 // ExecuteSftp executes SFTP operations
-func (c *SSHClient) ExecuteSftp() error {
+func (c *SSHClient) ExecuteSftp() (err error) {
 	sftpClient, err := sftp.NewClient(c.client)
 	if err != nil {
 		return fmt.Errorf("failed to create SFTP client: %w", err)
 	}
-	defer sftpClient.Close()
+	defer CloseIgnore(&err, sftpClient)
 	c.sftpClient = sftpClient
 
 	switch c.config.SftpAction {
@@ -387,18 +387,18 @@ func (c *SSHClient) ExecuteSftp() error {
 	}
 }
 
-func (c *SSHClient) uploadFile() error {
+func (c *SSHClient) uploadFile() (err error) {
 	localFile, err := os.Open(c.config.LocalPath)
 	if err != nil {
 		return fmt.Errorf("failed to open local file: %w", err)
 	}
-	defer localFile.Close()
+	defer CloseIgnore(&err, localFile)
 
 	remoteFile, err := c.sftpClient.Create(c.config.RemotePath)
 	if err != nil {
 		return fmt.Errorf("failed to create remote file: %w", err)
 	}
-	defer remoteFile.Close()
+	defer CloseIgnore(&err, remoteFile)
 
 	log.Printf("Uploading: %s → %s", c.config.LocalPath, c.config.RemotePath)
 
@@ -411,18 +411,18 @@ func (c *SSHClient) uploadFile() error {
 	return nil
 }
 
-func (c *SSHClient) downloadFile() error {
+func (c *SSHClient) downloadFile() (err error) {
 	remoteFile, err := c.sftpClient.Open(c.config.RemotePath)
 	if err != nil {
 		return fmt.Errorf("failed to open remote file: %w", err)
 	}
-	defer remoteFile.Close()
+	defer CloseIgnore(&err, remoteFile)
 
 	localFile, err := os.Create(c.config.LocalPath)
 	if err != nil {
 		return fmt.Errorf("failed to create local file: %w", err)
 	}
-	defer localFile.Close()
+	defer CloseIgnore(&err, localFile)
 
 	log.Printf("Downloading: %s → %s", c.config.RemotePath, c.config.LocalPath)
 

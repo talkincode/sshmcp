@@ -17,7 +17,7 @@ import (
 var ErrUsage = errors.New("usage displayed")
 
 // Run executes the CLI using the provided arguments (typically os.Args).
-func Run(args []string) error {
+func Run(args []string) (err error) {
 	// Handle MCP stdio mode
 	if len(args) >= 2 && (args[1] == "mcp-stdio" || args[1] == "--mcp-stdio") {
 		log.SetOutput(io.Discard)
@@ -67,7 +67,7 @@ func Run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create SSH client: %w", err)
 	}
-	defer client.Close()
+	defer sshclient.CloseIgnore(&err, client)
 
 	// Connect to remote host
 	if err = client.Connect(); err != nil {
