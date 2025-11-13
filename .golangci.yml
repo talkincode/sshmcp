@@ -6,19 +6,16 @@ run:
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
-    - gofmt
-    - goimports
     - misspell
     - unconvert
     - unparam
     - nakedret
     - prealloc
-    - exportloopref
+    - copyloopvar
     - noctx
     - gosec
 
@@ -28,7 +25,8 @@ linters-settings:
     check-blank: true
 
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
 
   gofmt:
     simplify: true

@@ -36,6 +36,7 @@ func Run(args []string) error {
 	}
 
 	// Load environment variables
+	//nolint:errcheck // Loading .env is optional
 	_ = godotenv.Load()
 
 	// Parse command-line arguments
@@ -69,20 +70,20 @@ func Run(args []string) error {
 	defer client.Close()
 
 	// Connect to remote host
-	if err := client.Connect(); err != nil {
+	if err = client.Connect(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
 
 	// Handle SFTP mode
 	if config.Mode == "sftp" {
-		if err := client.ExecuteSftp(); err != nil {
+		if err = client.ExecuteSftp(); err != nil {
 			return fmt.Errorf("SFTP operation failed: %w", err)
 		}
 		return nil
 	}
 
 	// Handle SSH command execution
-	if err := client.ExecuteCommand(); err != nil {
+	if err = client.ExecuteCommand(); err != nil {
 		return fmt.Errorf("failed to execute command: %w", err)
 	}
 

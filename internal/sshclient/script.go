@@ -34,9 +34,9 @@ func (c *SSHClient) ExecuteScript(localScriptPath string) (string, error) {
 
 	// 4. Ensure SFTP client is available
 	if c.sftpClient == nil {
-		sftpClient, err := sftp.NewClient(c.client)
-		if err != nil {
-			return "", fmt.Errorf("failed to create SFTP client: %w", err)
+		sftpClient, sftpErr := sftp.NewClient(c.client)
+		if sftpErr != nil {
+			return "", fmt.Errorf("failed to create SFTP client: %w", sftpErr)
 		}
 		c.sftpClient = sftpClient
 		defer c.sftpClient.Close()
@@ -64,7 +64,10 @@ func (c *SSHClient) ExecuteScript(localScriptPath string) (string, error) {
 
 	// 8. Clean up temp file (regardless of execution result)
 	cleanupCmd := fmt.Sprintf("rm -f %s", remotePath)
-	c.executeSimpleCommand(cleanupCmd)
+	if cleanupErr := c.executeSimpleCommand(cleanupCmd); cleanupErr != nil {
+		// Log cleanup error but don't fail the operation
+		_ = cleanupErr // Cleanup is best-effort
+	}
 
 	// 9. Return execution result
 	if execErr != nil {
@@ -132,9 +135,9 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 
 	// 4. Ensure SFTP client is available
 	if c.sftpClient == nil {
-		sftpClient, err := sftp.NewClient(c.client)
-		if err != nil {
-			return "", fmt.Errorf("failed to create SFTP client: %w", err)
+		sftpClient, sftpErr := sftp.NewClient(c.client)
+		if sftpErr != nil {
+			return "", fmt.Errorf("failed to create SFTP client: %w", sftpErr)
 		}
 		c.sftpClient = sftpClient
 		defer c.sftpClient.Close()
@@ -146,14 +149,14 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 		return "", fmt.Errorf("failed to create remote file: %w", err)
 	}
 
-	if _, err := remoteFile.Write(scriptContent); err != nil {
+	if _, err = remoteFile.Write(scriptContent); err != nil {
 		remoteFile.Close()
 		return "", fmt.Errorf("failed to write script: %w", err)
 	}
 	remoteFile.Close()
 
 	// 6. Add execute permission
-	if err := c.sftpClient.Chmod(remotePath, 0755); err != nil {
+	if err = c.sftpClient.Chmod(remotePath, 0755); err != nil {
 		return "", fmt.Errorf("failed to chmod script: %w", err)
 	}
 
@@ -171,7 +174,10 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 	// 8. Execute script
 	session, err := c.client.NewSession()
 	if err != nil {
-		c.executeSimpleCommand(fmt.Sprintf("rm -f %s", remotePath))
+		// Try to clean up on error
+		if cleanupErr := c.executeSimpleCommand(fmt.Sprintf("rm -f %s", remotePath)); cleanupErr != nil {
+			_ = cleanupErr // Cleanup is best-effort
+		}
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
 	defer session.Close()
@@ -179,7 +185,9 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 	output, execErr := session.CombinedOutput(command)
 
 	// 9. Clean up temp file
-	c.executeSimpleCommand(fmt.Sprintf("rm -f %s", remotePath))
+	if cleanupErr := c.executeSimpleCommand(fmt.Sprintf("rm -f %s", remotePath)); cleanupErr != nil {
+		_ = cleanupErr // Cleanup is best-effort
+	}
 
 	// 10. Return execution result
 	if execErr != nil {

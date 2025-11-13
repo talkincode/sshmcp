@@ -89,8 +89,8 @@ func getHostKeyCallback() ssh.HostKeyCallback {
 		if err != nil {
 			// Check if it's a knownhosts.KeyError (host key mismatch or unknown host)
 			var keyErr *knownhosts.KeyError
-			if errors, ok := err.(*knownhosts.KeyError); ok {
-				keyErr = errors
+			if keyError, ok := err.(*knownhosts.KeyError); ok {
+				keyErr = keyError
 				// If there are known keys but they don't match, it's a key change
 				if len(keyErr.Want) > 0 {
 					return fmt.Errorf("⚠️  HOST KEY VERIFICATION FAILED!\n"+
@@ -162,12 +162,12 @@ func (c *SSHClient) connectDirect() error {
 		}
 
 		if key, err := os.ReadFile(keyPath); err == nil {
-			signer, err := ssh.ParsePrivateKey(key)
-			if err == nil {
+			signer, signerErr := ssh.ParsePrivateKey(key)
+			if signerErr == nil {
 				authMethods = append(authMethods, ssh.PublicKeys(signer))
 				log.Printf("Using SSH key: %s", keyPath)
 			} else {
-				log.Printf("Warning: failed to parse SSH key: %v", err)
+				log.Printf("Warning: failed to parse SSH key: %v", signerErr)
 			}
 		} else {
 			log.Printf("Warning: failed to read SSH key file %s: %v", keyPath, err)

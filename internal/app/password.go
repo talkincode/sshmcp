@@ -148,12 +148,13 @@ func listPasswords() error {
 	found := false
 	for _, key := range commonKeys {
 		_, err := keyring.Get(sshclient.KeyringServiceName, key)
-		if err == nil {
+		switch err {
+		case nil:
 			fmt.Printf("  ✓ %s (exists)\n", key)
 			found = true
-		} else if err == keyring.ErrNotFound {
+		case keyring.ErrNotFound:
 			fmt.Printf("    %s (not set)\n", key)
-		} else {
+		default:
 			fmt.Printf("  ? %s (error: %v)\n", key, err)
 		}
 	}

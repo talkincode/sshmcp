@@ -1,0 +1,10 @@
+{
+  "yaml.schemas": {
+    "https://json.schemastore.org/golangci-lint.json": []
+  },
+  "yaml.validate": true,
+  "yaml.schemaStore.enable": true,
+  "files.associations": {
+    ".golangci.yml": "yaml"
+  }
+}

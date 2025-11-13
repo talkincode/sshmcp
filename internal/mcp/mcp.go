@@ -505,7 +505,7 @@ func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interfa
 	}
 	defer client.Close()
 
-	if err := client.Connect(); err != nil {
+	if err = client.Connect(); err != nil {
 		return "", fmt.Errorf("failed to connect: %w", err)
 	}
 
@@ -616,14 +616,17 @@ func (s *MCPServer) executeSftpList(config *sshclient.Config, args map[string]in
 	}
 	defer client.Close()
 
-	if err := client.Connect(); err != nil {
+	if err = client.Connect(); err != nil {
 		return "", err
 	}
 
 	// 捕获输出
 	var output strings.Builder
 	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
+	r, w, pipeErr := os.Pipe()
+	if pipeErr != nil {
+		return "", fmt.Errorf("failed to create pipe: %w", pipeErr)
+	}
 	os.Stdout = w
 
 	errChan := make(chan error, 1)
@@ -767,7 +770,7 @@ func (s *MCPServer) executeScript(config *sshclient.Config, args map[string]inte
 	}
 	defer client.Close()
 
-	if err := client.Connect(); err != nil {
+	if err = client.Connect(); err != nil {
 		return "", fmt.Errorf("failed to connect: %w", err)
 	}
 
