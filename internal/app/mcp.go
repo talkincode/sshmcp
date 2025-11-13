@@ -494,6 +494,9 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 	// 构建配置
 	config := &sshclient.Config{}
 
+	// 加载 settings 获取默认配置
+	settings, settingsErr := LoadSettings()
+
 	// 通用参数
 	if host, ok := args["host"].(string); ok && host != "" {
 		config.Host = host
@@ -514,6 +517,9 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 	}
 	if keyPath, ok := args["key_path"].(string); ok {
 		config.KeyPath = keyPath
+	} else if settingsErr == nil && settings.Key != "" {
+		// 使用 settings 中的默认密钥
+		config.KeyPath = settings.Key
 	}
 
 	switch name {
@@ -576,12 +582,22 @@ func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interfa
 		config.SudoKey = sshclient.DefaultSudoKey
 	}
 
-	// 如果命令包含 sudo，尝试获取密码
+	// 尝试从 settings 获取主机配置的密码键
+	settings, settingsErr := LoadSettings()
+	if settingsErr == nil {
+		// 尝试查找主机配置
+		for _, host := range settings.Hosts {
+			if host.Host == config.Host && host.PasswordKey != "" {
+				config.SudoKey = host.PasswordKey
+				break
+			}
+		}
+	}
+
+	// 只有当命令包含 sudo 时才获取密码
 	if strings.Contains(command, "sudo") && config.SudoKey != "" {
 		password, pwdErr := sshclient.GetSudoPassword(config.SudoKey)
-		if pwdErr != nil {
-			// 静默忽略，MCP 模式下不输出警告
-		} else {
+		if pwdErr == nil {
 			config.Password = password
 		}
 	}
@@ -592,7 +608,8 @@ func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interfa
 	}
 	defer sshclient.CloseIgnore(&err, client)
 
-	if err = client.Connect(); err != nil {
+	// 使用直接连接而不是连接池，避免连接复用导致的问题
+	if err = client.ConnectDirect(); err != nil {
 		return "", fmt.Errorf("failed to connect: %w", err)
 	}
 
@@ -1030,11 +1047,12 @@ func (s *MCPServer) executeHostTest(args map[string]interface{}) (string, error)
 		return "", fmt.Errorf("host '%s' not found: %w", name, err)
 	}
 
-	// Create SSH config for testing
+	// Create SSH config for testing with command
 	testConfig := &sshclient.Config{
-		Host: hostConfig.Host,
-		Port: hostConfig.Port,
-		User: hostConfig.User,
+		Host:    hostConfig.Host,
+		Port:    hostConfig.Port,
+		User:    hostConfig.User,
+		Command: "echo 'Connection test successful'",
 	}
 
 	// Get default SSH key if not specified
@@ -1050,37 +1068,23 @@ func (s *MCPServer) executeHostTest(args map[string]interface{}) (string, error)
 		}
 	}
 
-	// Create SSH client
+	// Create single SSH client for testing (avoid connection pool reuse issues)
 	client, err := sshclient.NewSSHClient(testConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to create SSH client: %w", err)
 	}
 	defer func() {
-		// Best-effort close, error already reported if connection fails
-		_ = client.Close() //nolint:errcheck
+		// Force close to avoid returning to pool
+		_ = client.ForceClose() //nolint:errcheck
 	}()
 
-	// Test connection
-	if connectErr := client.Connect(); connectErr != nil {
+	// Test connection - use direct connection to bypass pool
+	if connectErr := client.ConnectDirect(); connectErr != nil {
 		return "", fmt.Errorf("connection failed: %w", connectErr)
 	}
 
 	// Test command execution
-	testConfig.Command = "echo 'Connection test successful'"
-	client2, err := sshclient.NewSSHClient(testConfig)
-	if err != nil {
-		return "", fmt.Errorf("failed to create test client: %w", err)
-	}
-	defer func() {
-		// Best-effort close, error already reported if execution fails
-		_ = client2.Close() //nolint:errcheck
-	}()
-
-	if connectErr := client2.Connect(); connectErr != nil {
-		return "", fmt.Errorf("failed to connect: %w", connectErr)
-	}
-
-	output, err := client2.ExecuteCommandWithOutput()
+	output, err := client.ExecuteCommandWithOutput()
 	if err != nil {
 		return "", fmt.Errorf("command execution failed: %w", err)
 	}

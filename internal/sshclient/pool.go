@@ -74,10 +74,14 @@ func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 		}
 
 		// Connection is invalid, remove and recreate
-		if closeErr := pooledConn.client.Close(); closeErr != nil {
-			// Best-effort close, ignore error
-			_ = closeErr
+		pooledConn.mu.Lock()
+		if pooledConn.client != nil {
+			if closeErr := pooledConn.client.Close(); closeErr != nil {
+				// Best-effort close, ignore error
+				_ = closeErr
+			}
 		}
+		pooledConn.mu.Unlock()
 		delete(p.connections, key)
 	}
 	p.mu.Unlock()
@@ -147,8 +151,8 @@ func (p *ConnectionPool) createConnection(config *Config) (*ssh.Client, error) {
 		return nil, err
 	}
 
-	// Use connectDirect() to avoid recursive pool calls
-	if err := sshClient.connectDirect(); err != nil {
+	// Use ConnectDirect() to avoid recursive pool calls
+	if err := sshClient.ConnectDirect(); err != nil {
 		return nil, err
 	}
 
@@ -161,17 +165,22 @@ func (p *ConnectionPool) isConnectionAlive(client *ssh.Client) bool {
 		return false
 	}
 
-	// Try to create a session to test the connection
+	// Try to create a session and execute a simple command to verify connection
 	session, err := client.NewSession()
 	if err != nil {
 		return false
 	}
-	if closeErr := session.Close(); closeErr != nil {
-		// Best-effort close, ignore error
-		_ = closeErr
-	}
+	defer func() {
+		if closeErr := session.Close(); closeErr != nil {
+			// Best-effort close, ignore error
+			_ = closeErr
+		}
+	}()
 
-	return true
+	// Execute a lightweight command to truly verify the connection is alive
+	// This catches EOF and other connection issues that NewSession alone might miss
+	err = session.Run("echo ping")
+	return err == nil
 }
 
 // makeKey generates a connection pool key

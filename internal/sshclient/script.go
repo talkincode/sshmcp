@@ -2,6 +2,7 @@ package sshclient
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,7 +40,7 @@ func (c *SSHClient) ExecuteScript(localScriptPath string) (output string, err er
 			return "", fmt.Errorf("failed to create SFTP client: %w", sftpErr)
 		}
 		c.sftpClient = sftpClient
-		defer CloseIgnore(&err, c.sftpClient)
+		defer CloseIgnore(&err, c.sftpClient, io.EOF)
 	}
 
 	// 5. Upload script to remote
@@ -88,7 +89,7 @@ func (c *SSHClient) executeRemoteScript(remotePath string) (output string, err e
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer CloseIgnore(&err, session)
+	defer CloseIgnore(&err, session, io.EOF)
 
 	// Detect script type and execute
 	var command string
@@ -116,7 +117,7 @@ func (c *SSHClient) executeSimpleCommand(command string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer CloseIgnore(&err, session)
+	defer CloseIgnore(&err, session, io.EOF)
 
 	return session.Run(command)
 }
@@ -146,7 +147,7 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 			return "", fmt.Errorf("failed to create SFTP client: %w", sftpErr)
 		}
 		c.sftpClient = sftpClient
-		defer CloseIgnore(&err, c.sftpClient)
+		defer CloseIgnore(&err, c.sftpClient, io.EOF)
 	}
 
 	// 5. Upload script
@@ -154,7 +155,7 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 	if err != nil {
 		return "", fmt.Errorf("failed to create remote file: %w", err)
 	}
-	defer CloseIgnore(&err, remoteFile)
+	defer CloseIgnore(&err, remoteFile, io.EOF)
 
 	if _, err = remoteFile.Write(scriptContent); err != nil {
 		return "", fmt.Errorf("failed to write script: %w", err)
@@ -185,7 +186,7 @@ func (c *SSHClient) ExecuteScriptWithArgs(localScriptPath string, args []string)
 		}
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer CloseIgnore(&err, session)
+	defer CloseIgnore(&err, session, io.EOF)
 
 	outputBytes, execErr := session.CombinedOutput(command)
 	output = string(outputBytes)

@@ -151,11 +151,11 @@ func (c *SSHClient) Connect() error {
 	}
 
 	log.Printf("Connection pool failed, falling back to direct connection: %v", err)
-	return c.connectDirect()
+	return c.ConnectDirect()
 }
 
-// connectDirect establishes a direct SSH connection (without using connection pool)
-func (c *SSHClient) connectDirect() error {
+// ConnectDirect establishes a direct SSH connection (without using connection pool)
+func (c *SSHClient) ConnectDirect() error {
 	var authMethods []ssh.AuthMethod
 
 	if c.config.KeyPath != "" {
@@ -223,7 +223,8 @@ func (c *SSHClient) ExecuteCommand() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
-	defer CloseIgnore(&err, session)
+	// Ignore EOF error when closing PTY session
+	defer CloseIgnore(&err, session, io.EOF)
 
 	if c.config.Password != "" && strings.Contains(c.config.Command, "sudo") {
 		return c.executeInteractive(session)
@@ -244,7 +245,20 @@ func (c *SSHClient) ExecuteCommandWithOutput() (output string, err error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer CloseIgnore(&err, session)
+	// Ignore EOF error when closing PTY session
+	defer CloseIgnore(&err, session, io.EOF)
+
+	// Request PTY for better compatibility (like ExecuteCommand does)
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          0,
+		ssh.TTY_OP_ISPEED: 14400,
+		ssh.TTY_OP_OSPEED: 14400,
+	}
+
+	if ptyErr := session.RequestPty("xterm", 80, 40, modes); ptyErr != nil {
+		// PTY request failed, try without it
+		log.Printf("Warning: failed to request PTY: %v", ptyErr)
+	}
 
 	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout
@@ -266,6 +280,19 @@ func (c *SSHClient) ExecuteCommandWithOutput() (output string, err error) {
 	stderrStr := stderr.String()
 
 	if execErr != nil {
+		// EOF is a normal session close signal when using PTY, check if we got output
+		if execErr.Error() == "EOF" {
+			if output != "" || stderrStr != "" {
+				// Command executed successfully, EOF is just session termination
+				if stderrStr != "" {
+					output += "\n--- STDERR ---\n" + stderrStr
+				}
+				return output, nil
+			}
+			// EOF with no output means connection/authentication failed
+			return "", fmt.Errorf("connection closed unexpectedly (EOF) - check SSH key or password")
+		}
+
 		// Build comprehensive error message
 		errMsg := fmt.Sprintf("command failed: %v", execErr)
 
