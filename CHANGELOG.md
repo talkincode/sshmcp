@@ -9,7 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- N/A
+- **Host Configuration Management** - Store and manage frequently used host configurations
+  - Configuration file: `~/.sshmcp/settings.json`
+  - Import hosts from `~/.ssh/config` with `--host-import`
+  - Add hosts interactively with `--host-add`
+  - List configured hosts with `--host-list`
+  - Test host connections with `--host-test=<name>`
+  - Remove hosts with `--host-remove=<name>`
+  - Auto-resolve host details when using `-h=<hostname>`
+  - Support for default SSH key path in settings
+  - Per-host password key configuration
+- New host management MCP tools for AI assistant integration (deferred to next version due to circular dependency)
 
 ### Changed
 
@@ -19,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now includes stdout output when command fails
   - Now displays process exit codes for better debugging
   - Provides command and host context in error messages
+- Updated usage documentation with host management commands
 
 ### Fixed
 

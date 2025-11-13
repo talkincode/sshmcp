@@ -16,6 +16,11 @@ Usage:
   sshx --password-get=<key>                       # Get password from keyring
   sshx --password-delete=<key>                    # Delete password from keyring
   sshx --password-list                            # List common password keys
+  sshx --host-add                                 # Add host configuration
+  sshx --host-import                              # Import hosts from ~/.ssh/config
+  sshx --host-list                                # List configured hosts
+  sshx --host-test=<name>                         # Test host connection
+  sshx --host-remove=<name>                       # Remove host configuration
 
 MCP Mode:
   sshx mcp-stdio            Start MCP server in stdio mode
@@ -72,6 +77,24 @@ Password Management (Cross-Platform):
     macOS:   Uses Keychain
     Linux:   Uses Secret Service (gnome-keyring/kwallet)
     Windows: Uses Credential Manager
+
+Host Management:
+  --host-add                          Add new host (interactive or with options)
+  --host-import                       Import hosts from ~/.ssh/config
+  --host-list                         List all configured hosts (alias: --host-ls)
+  --host-test=<name>                  Test connection to configured host
+  --host-remove=<name>                Remove host from configuration (alias: --host-rm)
+
+  Host Add Options (used with --host-add):
+    --host-name=<name>                Host name (unique identifier)
+    --host-desc=<description>         Host description
+    -h=<address>                      Host address (IP or hostname)
+    -p=<port>                         SSH port
+    -u=<user>                         SSH username
+    -pk=<key>                         Password key name
+    --host-type=<type>                System type (linux/windows/macos)
+
+  Configuration file: ~/.sshmcp/settings.json
 
 Environment Variables (.env):
   SSH_PASSWORD          SSH password (not recommended, use SSH keys or keyring)
@@ -156,10 +179,36 @@ Password Management Examples:
   # Delete password from keyring
   sshx --password-delete=server-A
 
+Host Management Examples:
+  # Add host interactively
+  sshx --host-add
+
+  # Add host with command line options
+  sshx --host-add --host-name=prod-web -h=192.168.1.100 -u=root -pk=prod-web --host-desc="Production Web Server"
+
+  # Import hosts from ~/.ssh/config
+  sshx --host-import
+
+  # Import and overwrite existing hosts
+  sshx --host-import --force
+
+  # List all configured hosts
+  sshx --host-list
+
+  # Test connection to a configured host
+  sshx --host-test=prod-web
+
+  # Remove a host from configuration
+  sshx --host-remove=prod-web
+
+  # Use configured host (looks up from settings if not an IP)
+  sshx -h=prod-web "uptime"
+
 Note:
   - SSH key authentication is tried first, then password authentication
   - Sudo password is automatically retrieved from system keyring
   - SFTP operations use the same SSH connection
   - Password manager works across macOS/Linux/Windows
-  - Default user: master, Default sudo key: master`)
+  - Default user: master, Default sudo key: master
+  - Host configurations are stored in ~/.sshmcp/settings.json`)
 }

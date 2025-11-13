@@ -46,6 +46,12 @@ type Config struct {
 	PasswordAction string
 	PasswordKey    string
 	PasswordValue  string
+
+	// Host management fields
+	HostAction      string
+	HostName        string
+	HostDescription string
+	HostType        string
 }
 
 // SSHClient wraps an ssh.Client with optional pooled and sftp helpers.

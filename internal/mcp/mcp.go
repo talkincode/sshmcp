@@ -304,6 +304,101 @@ func defineMCPTools() []MCPTool {
 				Required:   []string{},
 			},
 		},
+		{
+			Name:        "host_add",
+			Description: "Add a new host configuration to settings",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"name": {
+						Type:        "string",
+						Description: "Host name (unique identifier)",
+					},
+					"host": {
+						Type:        "string",
+						Description: "Host address (IP or hostname)",
+					},
+					"description": {
+						Type:        "string",
+						Description: "Host description (optional)",
+					},
+					"port": {
+						Type:        "string",
+						Description: "SSH port",
+						Default:     "22",
+					},
+					"user": {
+						Type:        "string",
+						Description: "SSH username",
+						Default:     "master",
+					},
+					"password_key": {
+						Type:        "string",
+						Description: "Password key name (optional)",
+					},
+					"type": {
+						Type:        "string",
+						Description: "System type",
+						Enum:        []string{"linux", "windows", "macos"},
+						Default:     "linux",
+					},
+				},
+				Required: []string{"name", "host"},
+			},
+		},
+		{
+			Name:        "host_list",
+			Description: "List all configured hosts",
+			InputSchema: ToolSchema{
+				Type:       "object",
+				Properties: map[string]Property{},
+				Required:   []string{},
+			},
+		},
+		{
+			Name:        "host_test",
+			Description: "Test connection to a configured host",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"name": {
+						Type:        "string",
+						Description: "Host name to test",
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		{
+			Name:        "host_remove",
+			Description: "Remove a host from configuration",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"name": {
+						Type:        "string",
+						Description: "Host name to remove",
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		{
+			Name:        "host_import",
+			Description: "Import hosts from ~/.ssh/config",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"overwrite": {
+						Type:        "string",
+						Description: "Overwrite existing hosts",
+						Enum:        []string{"true", "false"},
+						Default:     "false",
+					},
+				},
+				Required: []string{},
+			},
+		},
 	}
 }
 
@@ -454,6 +549,8 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		return s.executeScript(config, args)
 	case "pool_stats":
 		return s.getPoolStats()
+	case "host_add", "host_list", "host_test", "host_remove", "host_import":
+		return "", fmt.Errorf("host management tools are not yet implemented in MCP mode (circular dependency issue - will be fixed in next version)")
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}

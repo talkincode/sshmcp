@@ -108,6 +108,32 @@ func ParseArgs(args []string) *sshclient.Config {
 		case arg == "--password-list" || arg == "--password-ls":
 			config.Mode = "password"
 			config.PasswordAction = "list"
+		case arg == "--host-add":
+			config.Mode = "host"
+			config.HostAction = "add"
+		case arg == "--host-import":
+			config.Mode = "host"
+			config.HostAction = "import"
+		case arg == "--host-list" || arg == "--host-ls":
+			config.Mode = "host"
+			config.HostAction = "list"
+		case strings.HasPrefix(arg, "--host-test="):
+			config.Mode = "host"
+			config.HostAction = "test"
+			config.HostName = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "--host-remove="), strings.HasPrefix(arg, "--host-rm="):
+			config.Mode = "host"
+			config.HostAction = "remove"
+			parts := strings.SplitN(arg, "=", 2)
+			if len(parts) > 1 {
+				config.HostName = parts[1]
+			}
+		case strings.HasPrefix(arg, "--host-name="):
+			config.HostName = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "--host-desc="):
+			config.HostDescription = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "--host-type="):
+			config.HostType = strings.SplitN(arg, "=", 2)[1]
 		case arg == "--help":
 			PrintUsage()
 			os.Exit(0)

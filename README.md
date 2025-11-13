@@ -49,6 +49,8 @@ English | [简体中文](./README_CN.md)
 
 Managing multiple servers means juggling different passwords, repeatedly entering sudo passwords, and manually executing SSH commands in AI assistants. `sshx` securely stores passwords in your system keyring, auto-fills sudo passwords, and enables AI assistants to directly operate remote servers through MCP protocol. One command, multiple servers, zero password hassle.
 
+**New!** Host Configuration Management - Store your frequently used host configurations in `~/.sshmcp/settings.json` and connect with just a name instead of typing full connection details every time. Import from your existing `~/.ssh/config` or add hosts interactively!
+
 ## Project Structure
 
 - `cmd/sshx`: Main binary entry point, responsible for command-line argument parsing, MCP mode startup, and password management features.
@@ -193,6 +195,69 @@ sshx -h=192.168.1.100 -u=root "df -h"
 # Start MCP stdio mode
 sshx mcp-stdio
 ```
+
+## Host Configuration Management
+
+**NEW!** Manage your frequently used hosts in `~/.sshmcp/settings.json` for quick access.
+
+### Quick Setup
+
+```bash
+# Import hosts from your existing ~/.ssh/config
+sshx --host-import
+
+# Or add hosts interactively
+sshx --host-add
+
+# Add host with command line options
+sshx --host-add --host-name=prod-web -h=192.168.1.100 -u=root --host-desc="Production Web Server"
+
+# List all configured hosts
+sshx --host-list
+
+# Test connection to a configured host
+sshx --host-test=prod-web
+
+# Use configured host (auto-resolves from settings)
+sshx -h=prod-web "systemctl status nginx"
+```
+
+### Configuration File Format
+
+Location: `~/.sshmcp/settings.json`
+
+```json
+{
+  "key": "/Users/username/.ssh/id_rsa",
+  "hosts": [
+    {
+      "name": "prod-web",
+      "description": "Production Web Server",
+      "host": "192.168.1.100",
+      "port": "22",
+      "user": "root",
+      "password_key": "prod-web-password",
+      "type": "linux"
+    }
+  ]
+}
+```
+
+### Host Management Commands
+
+- `--host-add` - Add new host (interactive or with options)
+- `--host-import` - Import hosts from `~/.ssh/config`
+- `--host-list` - List all configured hosts
+- `--host-test=<name>` - Test connection to a host
+- `--host-remove=<name>` - Remove a host from configuration
+
+**Benefits:**
+
+- 📝 Store connection details once, use everywhere
+- 🚀 Connect with just a name: `sshx -h=prod-web "command"`
+- 🔄 Import from existing `~/.ssh/config`
+- 🔐 Integrate with password manager for each host
+- ✅ Test connections before use
 
 ## Password Management
 

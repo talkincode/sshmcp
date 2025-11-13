@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -50,6 +51,21 @@ func Run(args []string) (err error) {
 		return nil
 	}
 
+	// Handle host management mode
+	if config.Mode == "host" {
+		if hostErr := HandleHostManagement(config); hostErr != nil {
+			return fmt.Errorf("host management failed: %w", hostErr)
+		}
+		return nil
+	}
+
+	// Try to resolve host from settings if not an IP address
+	if config.Host != "" && !isIPAddress(config.Host) {
+		if resolveErr := resolveHostFromSettings(config); resolveErr != nil {
+			log.Printf("Note: Could not find host '%s' in settings, using as hostname directly", config.Host)
+		}
+	}
+
 	// Auto-fill sudo password if needed
 	if strings.Contains(config.Command, "sudo") && config.SudoKey != "" {
 		password, pwdErr := sshclient.GetSudoPassword(config.SudoKey)
@@ -85,6 +101,55 @@ func Run(args []string) (err error) {
 	// Handle SSH command execution
 	if err = client.ExecuteCommand(); err != nil {
 		return fmt.Errorf("failed to execute command: %w", err)
+	}
+
+	return nil
+}
+
+// isIPAddress checks if a string is a valid IP address
+func isIPAddress(host string) bool {
+	return net.ParseIP(host) != nil
+}
+
+// resolveHostFromSettings tries to resolve host configuration from settings
+func resolveHostFromSettings(config *sshclient.Config) error {
+	// Load settings
+	settings, err := LoadSettings()
+	if err != nil {
+		return err
+	}
+
+	// Try to find host by name
+	hostConfig, err := GetHost(settings, config.Host)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("✓ Found host '%s' in settings", config.Host)
+
+	// Update config with host settings
+	config.Host = hostConfig.Host
+	if config.Port == "" || config.Port == "22" {
+		if hostConfig.Port != "" {
+			config.Port = hostConfig.Port
+		}
+	}
+	if config.User == "" || config.User == "master" {
+		if hostConfig.User != "" {
+			config.User = hostConfig.User
+		}
+	}
+
+	// Use configured password key if available
+	if hostConfig.PasswordKey != "" && config.SudoKey == sshclient.DefaultSudoKey {
+		config.SudoKey = hostConfig.PasswordKey
+		log.Printf("✓ Using password key: %s", hostConfig.PasswordKey)
+	}
+
+	// Use default SSH key from settings if available
+	if config.KeyPath == "" && settings.Key != "" {
+		config.KeyPath = settings.Key
+		log.Printf("✓ Using SSH key: %s", settings.Key)
 	}
 
 	return nil
