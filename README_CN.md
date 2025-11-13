@@ -177,8 +177,11 @@ make install
 # 执行远程命令
 sshx -h=192.168.1.100 -u=root "uptime"
 
-# 保存密码以便更轻松访问
-sshx --set-password host=192.168.1.100 user=root
+# 保存密码以便更轻松访问（交互式输入）
+sshx --password-set=root
+
+# 或者为特定主机设置密码
+sshx --password-set=192.168.1.100-root
 
 # 执行命令时无需密码标志（使用已保存的密码）
 sshx -h=192.168.1.100 -u=root "df -h"
@@ -202,13 +205,17 @@ sshx mcp-stdio
 #### 保存密码
 
 ```bash
-# 为特定主机保存密码
-./bin/sshx --set-password host=192.168.1.100 user=root
+# 保存默认 sudo 密码（交互式输入，推荐）
+sshx --password-set=master
 
-# 使用环境变量保存密码（推荐用于脚本）
-export SSH_HOST=192.168.1.100
-export SSH_USER=root
-./bin/sshx --set-password
+# 保存特定用户的密码
+sshx --password-set=root
+
+# 为特定主机+用户组合保存密码
+sshx --password-set=192.168.1.100-root
+
+# 直接设置密码（不推荐，不安全）
+sshx --password-set=master:yourpassword
 ```
 
 系统会提示您安全地输入密码（输入时隐藏）。
@@ -216,57 +223,128 @@ export SSH_USER=root
 #### 检查已保存的密码
 
 ```bash
-# 检查主机是否存在密码
-./bin/sshx --check-password host=192.168.1.100 user=root
+# 检查密码是否存在
+sshx --password-check=master
+sshx --password-check=root
 
 # 输出示例：
-# ✓ Password exists for root@192.168.1.100
+# ✓ Password exists for key: master
 ```
 
-#### 列出所有已保存的密码
+#### 列出已保存的密码
 
 ```bash
-# 列出所有存储的 SSH 凭据
-./bin/sshx --list-passwords
+# 列出常见的密码键
+sshx --password-list
 
 # 输出示例：
-# Stored SSH passwords:
-# - root@192.168.1.100
-# - admin@192.168.1.101
-# - ubuntu@192.168.1.102
+# Checking password keys in system keyring...
+# Service: sshx
+#
+# Common keys:
+#   ✓ master (exists)
+#   ✓ root (exists)
+#     sudo (not set)
+```
+
+#### 获取密码
+
+```bash
+# 获取存储的密码（用于调试）
+sshx --password-get=master
+
+# 输出示例：
+# ✓ Password retrieved from system keyring
+#   Service: sshx
+#   Key: master
+#
+# Password: yourpassword
 ```
 
 #### 删除密码
 
 ```bash
-# 删除特定主机的密码
-./bin/sshx --delete-password host=192.168.1.100 user=root
+# 删除密码
+sshx --password-delete=master
+sshx --password-delete=root
 
 # 确认消息：
-# ✓ Password deleted for root@192.168.1.100
+# ✓ Password deleted from system keyring
+#   Service: sshx
+#   Key: master
 ```
 
 ### 使用已存储的密码
 
-保存密码后，您可以在不使用 `-p` 标志的情况下连接：
+保存密码后,执行 sudo 命令时会自动从系统密钥链中检索密码:
 
 ```bash
-# 不使用密码管理（每次都需要 -p 标志）
-./bin/sshx -h=192.168.1.100 -u=root -p=yourpassword "uptime"
+# 1. 首先保存 sudo 密码
+sshx --password-set=master
 
-# 使用密码管理（不需要 -p 标志）
-./bin/sshx --set-password host=192.168.1.100 user=root  # 保存一次
-./bin/sshx -h=192.168.1.100 -u=root "uptime"            # 永久使用
+# 2. 执行 sudo 命令(自动使用存储的密码)
+sshx -h=192.168.1.100 -u=root "sudo systemctl status nginx"
+sshx -h=192.168.1.100 -u=root "sudo reboot"
+
+# 3. 多服务器场景:为不同服务器保存不同的密码
+sshx --password-set=server-A
+sshx --password-set=server-B
+sshx --password-set=server-C
+
+# 4. 使用 -pk 参数临时指定 sudo 密码 key
+sshx -h=192.168.1.100 -pk=server-A "sudo systemctl restart nginx"
+sshx -h=192.168.1.101 -pk=server-B "sudo systemctl restart nginx"
+sshx -h=192.168.1.102 -pk=server-C "sudo systemctl restart nginx"
 ```
 
-### 密码优先级
+### 密码键名说明
 
-执行 SSH 命令时，`sshx` 遵循以下优先级顺序：
+- **master**: 默认的 sudo 密码键名,用于 sudo 命令
+- **root**: root 用户的密码
+- **自定义键名**: 您可以使用任何键名,例如 `server-A`、`server-B`、`prod-db` 等
 
-1. **命令行密码**（`-p` 标志）- 最高优先级
-2. **环境变量**（`SSH_PASSWORD`）
-3. **已存储的密码**（来自系统凭据管理器）
-4. **交互式提示** - 如果以上都不可用
+### 多服务器密码管理最佳实践
+
+如果您管理多个服务器,即使用户名相同但密码不同,可以使用以下策略:
+
+```bash
+# 场景:管理 3 台服务器,都是 root 用户,但密码各不相同
+
+# 1. 为每台服务器保存密码(使用有意义的 key 名称)
+sshx --password-set=prod-web      # 生产环境 Web 服务器
+sshx --password-set=prod-db       # 生产环境数据库服务器
+sshx --password-set=dev-server    # 开发环境服务器
+
+# 2. 执行命令时使用 -pk 参数指定对应的密码 key
+sshx -h=192.168.1.10 -u=root -pk=prod-web "sudo systemctl status nginx"
+sshx -h=192.168.1.20 -u=root -pk=prod-db "sudo systemctl status mysql"
+sshx -h=192.168.1.30 -u=root -pk=dev-server "sudo docker ps"
+
+# 3. 也可以使用别名简化命令(添加到 ~/.zshrc 或 ~/.bashrc)
+alias ssh-prod-web='sshx -h=192.168.1.10 -u=root -pk=prod-web'
+alias ssh-prod-db='sshx -h=192.168.1.20 -u=root -pk=prod-db'
+alias ssh-dev='sshx -h=192.168.1.30 -u=root -pk=dev-server'
+
+# 然后就可以简单使用:
+ssh-prod-web "sudo systemctl restart nginx"
+ssh-prod-db "sudo systemctl restart mysql"
+ssh-dev "sudo docker-compose up -d"
+```
+
+### 环境变量配置
+
+可以通过环境变量自定义 sudo 密码键名(但不如使用 `-pk` 参数灵活):
+
+```bash
+# 使用环境变量(每次只能指定一个,需要不停修改)
+export SSH_SUDO_KEY=my-sudo-password
+sshx --password-set=my-sudo-password
+sshx -h=192.168.1.100 "sudo ls -la /root"
+
+# 推荐:使用 -pk 参数,更灵活,不需要修改环境变量
+sshx -h=192.168.1.100 -pk=server-A "sudo ls -la /root"
+sshx -h=192.168.1.101 -pk=server-B "sudo ls -la /root"
+```
 
 ### 安全说明
 
@@ -295,25 +373,31 @@ export SUDO_PASSWORD=your_sudo_password
 ### 示例工作流
 
 ```bash
-# 1. 保存密码一次
-./bin/sshx --set-password host=192.168.1.100 user=root
-# Enter password: ******
+# 1. 保存 sudo 密码（交互式输入）
+sshx --password-set=master
+# Enter password for key 'master': ******
 
 # 2. 验证已保存
-./bin/sshx --check-password host=192.168.1.100 user=root
-# ✓ Password exists for root@192.168.1.100
+sshx --password-check=master
+# ✓ Password exists for key: master
 
-# 3. 用于 SSH 命令（不需要密码）
-./bin/sshx -h=192.168.1.100 -u=root "ls -la /var/log"
-./bin/sshx -h=192.168.1.100 -u=root "df -h"
+# 3. 用于 SSH 命令（sudo 自动使用存储的密码）
+sshx -h=192.168.1.100 -u=root "sudo systemctl status docker"
+sshx -h=192.168.1.100 -u=root "sudo df -h"
 
-# 4. 用于 SFTP 操作（不需要密码）
-./bin/sshx -h=192.168.1.100 -u=root --sftp-get /etc/hosts ./hosts.txt
-./bin/sshx -h=192.168.1.100 -u=root --sftp-put ./local.txt /tmp/remote.txt
+# 4. 用于 SFTP 操作
+sshx -h=192.168.1.100 -u=root --upload=local.txt --to=/tmp/remote.txt
+sshx -h=192.168.1.100 -u=root --download=/etc/hosts --to=./hosts.txt
 
-# 5. 完成后，可选择删除密码
-./bin/sshx --delete-password host=192.168.1.100 user=root
-# ✓ Password deleted for root@192.168.1.100
+# 5. 列出所有已保存的密码键
+sshx --password-list
+# Common keys:
+#   ✓ master (exists)
+#     root (not set)
+
+# 6. 完成后，可选择删除密码
+sshx --password-delete=master
+# ✓ Password deleted from system keyring
 ```
 
 ## 故障排除

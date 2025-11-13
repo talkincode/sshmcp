@@ -177,8 +177,11 @@ make install
 # Execute remote command
 sshx -h=192.168.1.100 -u=root "uptime"
 
-# Save password for easier access
-sshx --set-password host=192.168.1.100 user=root
+# Save password for easier access (interactive input)
+sshx --password-set=root
+
+# Or set password for specific host
+sshx --password-set=192.168.1.100-root
 
 # Execute command without password flag (uses saved password)
 sshx -h=192.168.1.100 -u=root "df -h"
@@ -202,13 +205,17 @@ sshx mcp-stdio
 #### Save Password
 
 ```bash
-# Save password for a specific host
-./bin/sshx --set-password host=192.168.1.100 user=root
+# Save default sudo password (interactive input, recommended)
+sshx --password-set=master
 
-# Save password with environment variables (recommended for scripts)
-export SSH_HOST=192.168.1.100
-export SSH_USER=root
-./bin/sshx --set-password
+# Save password for specific user
+sshx --password-set=root
+
+# Save password for specific host+user combination
+sshx --password-set=192.168.1.100-root
+
+# Set password inline (not recommended, insecure)
+sshx --password-set=master:yourpassword
 ```
 
 You will be prompted to enter the password securely (input is hidden).
@@ -216,57 +223,128 @@ You will be prompted to enter the password securely (input is hidden).
 #### Check Saved Password
 
 ```bash
-# Check if password exists for a host
-./bin/sshx --check-password host=192.168.1.100 user=root
+# Check if password exists
+sshx --password-check=master
+sshx --password-check=root
 
 # Output example:
-# ✓ Password exists for root@192.168.1.100
+# ✓ Password exists for key: master
 ```
 
-#### List All Saved Passwords
+#### List Saved Passwords
 
 ```bash
-# List all stored SSH credentials
-./bin/sshx --list-passwords
+# List common password keys
+sshx --password-list
 
 # Output example:
-# Stored SSH passwords:
-# - root@192.168.1.100
-# - admin@192.168.1.101
-# - ubuntu@192.168.1.102
+# Checking password keys in system keyring...
+# Service: sshx
+#
+# Common keys:
+#   ✓ master (exists)
+#   ✓ root (exists)
+#     sudo (not set)
+```
+
+#### Get Password
+
+```bash
+# Get stored password (for debugging)
+sshx --password-get=master
+
+# Output example:
+# ✓ Password retrieved from system keyring
+#   Service: sshx
+#   Key: master
+#
+# Password: yourpassword
 ```
 
 #### Delete Password
 
 ```bash
-# Delete password for a specific host
-./bin/sshx --delete-password host=192.168.1.100 user=root
+# Delete password
+sshx --password-delete=master
+sshx --password-delete=root
 
 # Confirmation message:
-# ✓ Password deleted for root@192.168.1.100
+# ✓ Password deleted from system keyring
+#   Service: sshx
+#   Key: master
 ```
 
 ### Using Stored Passwords
 
-Once a password is saved, you can connect without the `-p` flag:
+Once a password is saved, sudo commands will automatically retrieve the password from system keyring:
 
 ```bash
-# Without password management (requires -p flag every time)
-./bin/sshx -h=192.168.1.100 -u=root -p=yourpassword "uptime"
+# 1. First save sudo password
+sshx --password-set=master
 
-# With password management (no -p flag needed)
-./bin/sshx --set-password host=192.168.1.100 user=root  # Save once
-./bin/sshx -h=192.168.1.100 -u=root "uptime"            # Use forever
+# 2. Execute sudo commands (automatically uses stored password)
+sshx -h=192.168.1.100 -u=root "sudo systemctl status nginx"
+sshx -h=192.168.1.100 -u=root "sudo reboot"
+
+# 3. Multi-server scenario: save different passwords for different servers
+sshx --password-set=server-A
+sshx --password-set=server-B
+sshx --password-set=server-C
+
+# 4. Use -pk parameter to specify sudo password key temporarily
+sshx -h=192.168.1.100 -pk=server-A "sudo systemctl restart nginx"
+sshx -h=192.168.1.101 -pk=server-B "sudo systemctl restart nginx"
+sshx -h=192.168.1.102 -pk=server-C "sudo systemctl restart nginx"
 ```
 
-### Password Priority
+### Password Key Names
 
-When executing SSH commands, `sshx` follows this priority order:
+- **master**: Default sudo password key name, used for sudo commands
+- **root**: Password for root user
+- **Custom keys**: You can use any key name, e.g., `server-A`, `server-B`, `prod-db`, etc.
 
-1. **Command-line password** (`-p` flag) - highest priority
-2. **Environment variable** (`SSH_PASSWORD`)
-3. **Stored password** (from system credential manager)
-4. **Interactive prompt** - if none of the above are available
+### Best Practices for Multi-Server Password Management
+
+If you manage multiple servers with the same username but different passwords, use this strategy:
+
+```bash
+# Scenario: Manage 3 servers, all with root user but different passwords
+
+# 1. Save password for each server (use meaningful key names)
+sshx --password-set=prod-web      # Production web server
+sshx --password-set=prod-db       # Production database server
+sshx --password-set=dev-server    # Development server
+
+# 2. Execute commands using -pk parameter to specify password key
+sshx -h=192.168.1.10 -u=root -pk=prod-web "sudo systemctl status nginx"
+sshx -h=192.168.1.20 -u=root -pk=prod-db "sudo systemctl status mysql"
+sshx -h=192.168.1.30 -u=root -pk=dev-server "sudo docker ps"
+
+# 3. You can also use aliases to simplify commands (add to ~/.zshrc or ~/.bashrc)
+alias ssh-prod-web='sshx -h=192.168.1.10 -u=root -pk=prod-web'
+alias ssh-prod-db='sshx -h=192.168.1.20 -u=root -pk=prod-db'
+alias ssh-dev='sshx -h=192.168.1.30 -u=root -pk=dev-server'
+
+# Then use simply:
+ssh-prod-web "sudo systemctl restart nginx"
+ssh-prod-db "sudo systemctl restart mysql"
+ssh-dev "sudo docker-compose up -d"
+```
+
+### Environment Variables
+
+You can customize the sudo password key name via environment variable (but using `-pk` parameter is more flexible):
+
+```bash
+# Use environment variable (can only specify one at a time, needs constant modification)
+export SSH_SUDO_KEY=my-sudo-password
+sshx --password-set=my-sudo-password
+sshx -h=192.168.1.100 "sudo ls -la /root"
+
+# Recommended: Use -pk parameter, more flexible, no need to modify environment variables
+sshx -h=192.168.1.100 -pk=server-A "sudo ls -la /root"
+sshx -h=192.168.1.101 -pk=server-B "sudo ls -la /root"
+```
 
 ### Security Notes
 
@@ -295,25 +373,31 @@ export SUDO_PASSWORD=your_sudo_password
 ### Example Workflow
 
 ```bash
-# 1. Save password once
-./bin/sshx --set-password host=192.168.1.100 user=root
-# Enter password: ******
+# 1. Save sudo password (interactive input)
+sshx --password-set=master
+# Enter password for key 'master': ******
 
 # 2. Verify it's saved
-./bin/sshx --check-password host=192.168.1.100 user=root
-# ✓ Password exists for root@192.168.1.100
+sshx --password-check=master
+# ✓ Password exists for key: master
 
-# 3. Use it for SSH commands (no password needed)
-./bin/sshx -h=192.168.1.100 -u=root "ls -la /var/log"
-./bin/sshx -h=192.168.1.100 -u=root "df -h"
+# 3. Use for SSH commands (sudo automatically uses stored password)
+sshx -h=192.168.1.100 -u=root "sudo systemctl status docker"
+sshx -h=192.168.1.100 -u=root "sudo df -h"
 
-# 4. Use it for SFTP operations (no password needed)
-./bin/sshx -h=192.168.1.100 -u=root --sftp-get /etc/hosts ./hosts.txt
-./bin/sshx -h=192.168.1.100 -u=root --sftp-put ./local.txt /tmp/remote.txt
+# 4. Use for SFTP operations
+sshx -h=192.168.1.100 -u=root --upload=local.txt --to=/tmp/remote.txt
+sshx -h=192.168.1.100 -u=root --download=/etc/hosts --to=./hosts.txt
 
-# 5. When done, optionally delete the password
-./bin/sshx --delete-password host=192.168.1.100 user=root
-# ✓ Password deleted for root@192.168.1.100
+# 5. List all saved password keys
+sshx --password-list
+# Common keys:
+#   ✓ master (exists)
+#     root (not set)
+
+# 6. When done, optionally delete the password
+sshx --password-delete=master
+# ✓ Password deleted from system keyring
 ```
 
 ## Troubleshooting

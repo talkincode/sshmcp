@@ -12,9 +12,10 @@ Usage:
   sshx -h=<host> [options] <command>              # SSH mode
   sshx -h=<host> [options] --upload=<file>        # SFTP upload
   sshx -h=<host> [options] --download=<file>      # SFTP download
-  sshx --password-set=<key>[:<value>]             # Password management
-  sshx --password-get=<key>                       # Get password
-  sshx --password-list                            # List passwords
+  sshx --password-set=<key>[:<password>]          # Set password in keyring
+  sshx --password-get=<key>                       # Get password from keyring
+  sshx --password-delete=<key>                    # Delete password from keyring
+  sshx --password-list                            # List common password keys
 
 MCP Mode:
   sshx mcp-stdio            Start MCP server in stdio mode
@@ -33,11 +34,12 @@ MCP Mode:
     - password_list         List common password keys
 
 SSH Options:
-  -h, --host=HOST       Remote host address (required)
-  -p, --port=PORT       SSH port (default: 22)
-  -u, --user=USER       SSH username (default: master)
-  -i, --key=PATH        SSH private key path (default: ~/.ssh/id_rsa)
-  --help                Show this help message
+  -h, --host=HOST          Remote host address (required)
+  -p, --port=PORT          SSH port (default: 22)
+  -u, --user=USER          SSH username (default: master)
+  -i, --key=PATH           SSH private key path (default: ~/.ssh/id_rsa)
+  -pk, --password-key=KEY  Sudo password keyring key name (default: master)
+  --help                   Show this help message
 
 Safety Options:
   -f, --force           Force execution, bypass safety checks (use with caution!)
@@ -85,6 +87,10 @@ SSH Examples:
   # Execute sudo command (auto password from keyring: master)
   sshx -h=192.168.1.100 "sudo systemctl status docker"
 
+  # Use custom sudo password key for specific server
+  sshx -h=192.168.1.100 -pk=server-A "sudo systemctl restart nginx"
+  sshx -h=192.168.1.101 -pk=server-B "sudo systemctl restart nginx"
+
   # Custom SSH port
   sshx -h=192.168.1.100 -p=2222 "ps aux | grep nginx"
 
@@ -118,30 +124,37 @@ SFTP Examples:
   done
 
 Password Management Examples:
-  # Set sudo password (interactive prompt)
+  # Set default sudo password (interactive prompt)
   sshx --password-set=master
 
   # Set sudo password (inline, not recommended for security)
   sshx --password-set=master:mypassword
 
-  # Set custom password
-  sshx --password-set=myserver
+  # Set passwords for different servers with same username
+  sshx --password-set=server-A
+  sshx --password-set=server-B
+  sshx --password-set=server-C
 
-  # Get password
+  # Use different password keys for different servers
+  sshx -h=192.168.1.100 -pk=server-A "sudo systemctl status nginx"
+  sshx -h=192.168.1.101 -pk=server-B "sudo systemctl status nginx"
+  sshx -h=192.168.1.102 -pk=server-C "sudo systemctl status nginx"
+
+  # Set password for specific user
+  sshx --password-set=root
+  sshx --password-set=admin
+
+  # Get password from keyring
   sshx --password-get=master
 
   # Check if password exists
-  sshx --password-check=test-password
+  sshx --password-check=server-A
 
   # List common password keys
   sshx --password-list
 
-  # Delete password
-  sshx --password-delete=master
-
-  # Set password for specific server
-  sshx --password-set=prod-server:secretpass
-  sshx -h=prod-server "sudo reboot"  # Will use ENV SSH_SUDO_KEY or master
+  # Delete password from keyring
+  sshx --password-delete=server-A
 
 Note:
   - SSH key authentication is tried first, then password authentication

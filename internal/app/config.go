@@ -47,6 +47,8 @@ func ParseArgs(args []string) *sshclient.Config {
 			config.User = strings.SplitN(arg, "=", 2)[1]
 		case strings.HasPrefix(arg, "-i="), strings.HasPrefix(arg, "--key="):
 			config.KeyPath = strings.SplitN(arg, "=", 2)[1]
+		case strings.HasPrefix(arg, "-pk="), strings.HasPrefix(arg, "--password-key="):
+			config.SudoKey = strings.SplitN(arg, "=", 2)[1]
 		case arg == "--force", arg == "-f":
 			config.Force = true
 		case arg == "--no-safety-check":
