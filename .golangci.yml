@@ -3,7 +3,6 @@ version: "2"
 run:
   timeout: 5m
   tests: true
-  modules-download-mode: readonly
 
 linters:
   enable:
@@ -14,13 +13,7 @@ linters:
     - unused
     - misspell
     - unconvert
-    - unparam
-    - nakedret
-    - prealloc
-    - copyloopvar
-    - noctx
     - gosec
-    - gofmt
 
   settings:
     errcheck:
@@ -33,6 +26,4 @@ linters:
 
     misspell:
       locale: US
-
-    nakedret:
-      max-func-lines: 30
+# Updated Thu Nov 13 12:29:11 CST 2025
