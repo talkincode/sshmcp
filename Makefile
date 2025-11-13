@@ -154,6 +154,10 @@ tag:
 	@echo "🏷️  Starting tag creation process..."
 	@./scripts/tag.sh
 
+renote:
+	@echo "🏷️  开始更新release note..."
+	@./scripts/release-note.sh
+
 dev: ## Development mode (install deps, format, test, build)
 	@echo "Development mode..."
 	@$(MAKE) deps
