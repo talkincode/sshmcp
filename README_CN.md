@@ -60,7 +60,34 @@ $$\   $$ |$$\   $$ |$$ |  $$ |$$ |\$  /$$ |$$ |  $$\ $$ |
 
 ## 安装
 
-### 一键安装（推荐）
+### 使用 Go 快速安装（推荐 Go 用户）
+
+如果您已安装 Go 1.21+，可以使用 Go 的内置工具：
+
+#### 直接运行无需安装（类似 npx）
+
+```bash
+# 运行最新版本
+go run github.com/talkincode/sshmcp/cmd/sshx@latest --help
+
+# 运行指定版本
+go run github.com/talkincode/sshmcp/cmd/sshx@v0.0.6 -h=192.168.1.100 "uptime"
+```
+
+#### 全局安装
+
+```bash
+# 安装最新版本到 $GOPATH/bin
+go install github.com/talkincode/sshmcp/cmd/sshx@latest
+
+# 然后可以在任何地方使用
+sshx --help
+sshx -h=192.168.1.100 "uptime"
+```
+
+**注意：** 确保 `$GOPATH/bin`（通常是 `~/go/bin`）在您的 PATH 中。
+
+### 一键安装脚本
 
 #### Linux / macOS
 

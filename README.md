@@ -60,7 +60,34 @@ English | [简体中文](./README_CN.md)
 
 ## Installation
 
-### One-Line Installation (Recommended)
+### Quick Install with Go (Recommended for Go Users)
+
+If you have Go 1.21+ installed, you can use Go's built-in tools:
+
+#### Run directly without installation (like npx)
+
+```bash
+# Run the latest version
+go run github.com/talkincode/sshmcp/cmd/sshx@latest --help
+
+# Run specific version
+go run github.com/talkincode/sshmcp/cmd/sshx@v0.0.6 -h=192.168.1.100 "uptime"
+```
+
+#### Install globally
+
+```bash
+# Install latest version to $GOPATH/bin
+go install github.com/talkincode/sshmcp/cmd/sshx@latest
+
+# Then use it anywhere
+sshx --help
+sshx -h=192.168.1.100 "uptime"
+```
+
+**Note:** Make sure `$GOPATH/bin` (typically `~/go/bin`) is in your PATH.
+
+### One-Line Installation Script
 
 #### Linux / macOS
 
