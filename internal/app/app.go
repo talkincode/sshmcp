@@ -10,7 +10,6 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/talkincode/sshmcp/internal/mcp"
 	"github.com/talkincode/sshmcp/internal/sshclient"
 )
 
@@ -23,7 +22,7 @@ func Run(args []string) (err error) {
 	if len(args) >= 2 && (args[1] == "mcp-stdio" || args[1] == "--mcp-stdio") {
 		log.SetOutput(io.Discard)
 
-		server := mcp.NewMCPServer()
+		server := NewMCPServer()
 		if startErr := server.Start(); startErr != nil {
 			return startErr
 		}

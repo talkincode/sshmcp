@@ -1,4 +1,4 @@
-package mcp
+package app
 
 import (
 	"bufio"
@@ -533,8 +533,14 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		return s.executeScript(config, args)
 	case "pool_stats":
 		return s.getPoolStats()
-	case "host_add", "host_list", "host_test", "host_remove":
-		return "", fmt.Errorf("host management tools are not yet implemented in MCP mode (circular dependency issue - will be fixed in next version)")
+	case "host_add":
+		return s.executeHostAdd(args)
+	case "host_list":
+		return s.executeHostList(args)
+	case "host_test":
+		return s.executeHostTest(args)
+	case "host_remove":
+		return s.executeHostRemove(args)
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}
@@ -895,4 +901,219 @@ func (s *MCPServer) getPoolStats() (string, error) {
 	output.WriteString(fmt.Sprintf("Health Check Interval: %v\n", stats["health_check_interval"]))
 
 	return output.String(), nil
+}
+
+// executeHostAdd 执行添加主机配置
+func (s *MCPServer) executeHostAdd(args map[string]interface{}) (string, error) {
+	// Load settings
+	settings, err := LoadSettings()
+	if err != nil {
+		return "", fmt.Errorf("failed to load settings: %w", err)
+	}
+
+	// Extract parameters
+	name, ok := args["name"].(string)
+	if !ok || name == "" {
+		return "", fmt.Errorf("name is required")
+	}
+
+	host, ok := args["host"].(string)
+	if !ok || host == "" {
+		return "", fmt.Errorf("host address is required")
+	}
+
+	// Build host config
+	hostConfig := HostConfig{
+		Name: name,
+		Host: host,
+	}
+
+	// Optional parameters
+	if description, ok := args["description"].(string); ok {
+		hostConfig.Description = description
+	}
+
+	if port, ok := args["port"].(string); ok && port != "" {
+		hostConfig.Port = port
+	} else {
+		hostConfig.Port = "22"
+	}
+
+	if user, ok := args["user"].(string); ok && user != "" {
+		hostConfig.User = user
+	} else {
+		hostConfig.User = "master"
+	}
+
+	if passwordKey, ok := args["password_key"].(string); ok {
+		hostConfig.PasswordKey = passwordKey
+	}
+
+	if hostType, ok := args["type"].(string); ok && hostType != "" {
+		hostConfig.Type = hostType
+	} else {
+		hostConfig.Type = "linux"
+	}
+
+	// Add host
+	if err := AddHost(settings, hostConfig); err != nil {
+		return "", fmt.Errorf("failed to add host: %w", err)
+	}
+
+	// Save settings
+	if err := SaveSettings(settings); err != nil {
+		return "", fmt.Errorf("failed to save settings: %w", err)
+	}
+
+	return fmt.Sprintf("Host '%s' (%s) added successfully", name, host), nil
+}
+
+// executeHostList 执行列出主机配置
+func (s *MCPServer) executeHostList(args map[string]interface{}) (string, error) {
+	// Load settings
+	settings, err := LoadSettings()
+	if err != nil {
+		return "", fmt.Errorf("failed to load settings: %w", err)
+	}
+
+	hosts := ListHosts(settings)
+
+	if len(hosts) == 0 {
+		return "No hosts configured.\n\nTo add hosts, use the host_add tool.", nil
+	}
+
+	// Build output
+	var output strings.Builder
+	output.WriteString(fmt.Sprintf("=== Configured Hosts (%d) ===\n\n", len(hosts)))
+
+	for i, host := range hosts {
+		output.WriteString(fmt.Sprintf("[%d] %s\n", i+1, host.Name))
+		output.WriteString(fmt.Sprintf("    Host:        %s\n", host.Host))
+		if host.Description != "" {
+			output.WriteString(fmt.Sprintf("    Description: %s\n", host.Description))
+		}
+		if host.Port != "" && host.Port != "22" {
+			output.WriteString(fmt.Sprintf("    Port:        %s\n", host.Port))
+		}
+		if host.User != "" {
+			output.WriteString(fmt.Sprintf("    User:        %s\n", host.User))
+		}
+		if host.PasswordKey != "" {
+			output.WriteString(fmt.Sprintf("    Password Key: %s\n", host.PasswordKey))
+		}
+		if host.Type != "" {
+			output.WriteString(fmt.Sprintf("    Type:        %s\n", host.Type))
+		}
+		output.WriteString("\n")
+	}
+
+	return output.String(), nil
+}
+
+// executeHostTest 执行测试主机连接
+func (s *MCPServer) executeHostTest(args map[string]interface{}) (string, error) {
+	// Load settings
+	settings, err := LoadSettings()
+	if err != nil {
+		return "", fmt.Errorf("failed to load settings: %w", err)
+	}
+
+	// Extract name parameter
+	name, ok := args["name"].(string)
+	if !ok || name == "" {
+		return "", fmt.Errorf("host name is required")
+	}
+
+	// Get host configuration
+	hostConfig, err := GetHost(settings, name)
+	if err != nil {
+		return "", fmt.Errorf("host '%s' not found: %w", name, err)
+	}
+
+	// Create SSH config for testing
+	testConfig := &sshclient.Config{
+		Host: hostConfig.Host,
+		Port: hostConfig.Port,
+		User: hostConfig.User,
+	}
+
+	// Get default SSH key if not specified
+	if settings.Key != "" {
+		testConfig.KeyPath = settings.Key
+	}
+
+	// Try to get password if password key is configured
+	if hostConfig.PasswordKey != "" {
+		password, pwdErr := sshclient.GetSudoPassword(hostConfig.PasswordKey)
+		if pwdErr == nil {
+			testConfig.Password = password
+		}
+	}
+
+	// Create SSH client
+	client, err := sshclient.NewSSHClient(testConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to create SSH client: %w", err)
+	}
+	defer func() {
+		// Best-effort close, error already reported if connection fails
+		_ = client.Close() //nolint:errcheck
+	}()
+
+	// Test connection
+	if connectErr := client.Connect(); connectErr != nil {
+		return "", fmt.Errorf("connection failed: %w", connectErr)
+	}
+
+	// Test command execution
+	testConfig.Command = "echo 'Connection test successful'"
+	client2, err := sshclient.NewSSHClient(testConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to create test client: %w", err)
+	}
+	defer func() {
+		// Best-effort close, error already reported if execution fails
+		_ = client2.Close() //nolint:errcheck
+	}()
+
+	if connectErr := client2.Connect(); connectErr != nil {
+		return "", fmt.Errorf("failed to connect: %w", connectErr)
+	}
+
+	output, err := client2.ExecuteCommandWithOutput()
+	if err != nil {
+		return "", fmt.Errorf("command execution failed: %w", err)
+	}
+
+	result := fmt.Sprintf("✓ Connection to '%s' (%s) successful!\n✓ Command execution successful!\n\nTest output: %s",
+		name, hostConfig.Host, strings.TrimSpace(output))
+
+	return result, nil
+}
+
+// executeHostRemove 执行删除主机配置
+func (s *MCPServer) executeHostRemove(args map[string]interface{}) (string, error) {
+	// Load settings
+	settings, err := LoadSettings()
+	if err != nil {
+		return "", fmt.Errorf("failed to load settings: %w", err)
+	}
+
+	// Extract name parameter
+	name, ok := args["name"].(string)
+	if !ok || name == "" {
+		return "", fmt.Errorf("host name is required")
+	}
+
+	// Remove host
+	if err := RemoveHost(settings, name); err != nil {
+		return "", fmt.Errorf("failed to remove host: %w", err)
+	}
+
+	// Save settings
+	if err := SaveSettings(settings); err != nil {
+		return "", fmt.Errorf("failed to save settings: %w", err)
+	}
+
+	return fmt.Sprintf("Host '%s' removed successfully", name), nil
 }

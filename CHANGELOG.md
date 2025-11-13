@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Host Configuration Management** - Store and manage frequently used host configurations
   - Configuration file: `~/.sshmcp/settings.json`
-  - Import hosts from `~/.ssh/config` with `--host-import`
   - Add hosts interactively with `--host-add`
   - List configured hosts with `--host-list`
   - Test host connections with `--host-test=<name>`
@@ -19,7 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Auto-resolve host details when using `-h=<hostname>`
   - Support for default SSH key path in settings
   - Per-host password key configuration
-- New host management MCP tools for AI assistant integration (deferred to next version due to circular dependency)
+- **MCP Host Management Tools** - Full support for host management in AI assistant integration
+  - `host_add` - Add new host configurations
+  - `host_list` - List all configured hosts
+  - `host_test` - Test host connections
+  - `host_remove` - Remove host configurations
 
 ### Changed
 
@@ -30,11 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now displays process exit codes for better debugging
   - Provides command and host context in error messages
 - Updated usage documentation with host management commands
+- **Refactored MCP implementation** - Moved MCP server to app package to resolve circular dependency
+  - Moved `internal/mcp/mcp.go` to `internal/app/mcp.go`
+  - Removed separate `mcp` package
+  - Enabled full host management functionality in MCP mode
 
 ### Fixed
 
 - Fixed issue where MCP error messages lacked specific error details (only showed "Process exited with status X")
 - Improved error message formatting to include all available diagnostic information
+- **Fixed circular dependency issue** preventing host management tools from working in MCP mode
+- Fixed EOF error handling in PTY execution mode
 
 ## [0.0.7] - 2025-11-13
 
