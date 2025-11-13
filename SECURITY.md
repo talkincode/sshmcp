@@ -6,9 +6,10 @@ We take security seriously. The following versions of SSHMCP are currently suppo
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.0.7   | :white_check_mark: |
+| 0.0.6   | :white_check_mark: |
 | 0.0.5   | :white_check_mark: |
-| 0.0.4   | :white_check_mark: |
-| < 0.0.4 | :x:                |
+| < 0.0.5 | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -65,11 +66,13 @@ When reporting a vulnerability, please include:
 When using SSHMCP, we recommend:
 
 - **Keep Updated**: Always use the latest version with security patches
-- **Secure Credentials**: Use the built-in password management feature to store SSH credentials securely
+- **Secure Credentials**: Use the built-in password management feature to store SSH credentials securely in system keyring
+- **Password Key Management**: Use meaningful and unique password key names for different servers (e.g., `server-A`, `prod-web`, `dev-db`)
 - **SSH Keys**: Prefer SSH key authentication over password authentication when possible
 - **Review Commands**: Always review commands before execution, especially with the `--force` flag
 - **Limit Permissions**: Run SSHMCP with minimum required privileges
 - **Network Security**: Use SSHMCP only on trusted networks when handling sensitive credentials
+- **Avoid Inline Passwords**: Never use inline passwords in commands (e.g., `--password-set=key:password`); always use interactive prompts
 
 ## Known Security Considerations
 
@@ -83,9 +86,14 @@ SSHMCP includes built-in validation to prevent dangerous commands (e.g., `rm -rf
 
 ### Credential Storage
 
-- Passwords are stored in the system keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- Passwords are stored securely in the system keyring:
+  - **macOS**: Keychain Access
+  - **Windows**: Credential Manager
+  - **Linux**: Secret Service (GNOME Keyring / KDE Wallet)
+- Use the `-pk` / `--password-key` parameter to specify different password keys for different servers
 - SSH private keys should have appropriate file permissions (600)
 - Never commit credentials to version control
+- Never share password key names that might reveal server infrastructure details
 
 ## Contact
 

@@ -19,6 +19,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - N/A
 
+## [0.0.7] - 2025-11-13
+
+### Added
+
+- New `-pk` / `--password-key` parameter for flexible sudo password key specification
+- Multi-server password management best practices documentation
+- Support for managing multiple servers with same username but different passwords
+
+### Changed
+
+- Updated password management documentation with correct command formats
+- Improved usage examples with multi-server scenarios
+- Enhanced documentation clarity for password key naming conventions
+
+### Fixed
+
+- Corrected password management command examples (use `--password-set` instead of `--set-password`)
+- Fixed documentation inconsistencies in password management sections
+
+## [0.0.6] - 2025-11-13
+
+### Changed
+
+- Updated module path to match repository name for better package management
+
+### Fixed
+
+- Fixed module path inconsistencies
+
 ## [0.0.5] - 2025-11-13
 
 ### Added
@@ -80,7 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD workflow and automated release process
 - Tag creation script
 
-[Unreleased]: https://github.com/talkincode/sshmcp/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/talkincode/sshmcp/compare/v0.0.7...HEAD
+[0.0.7]: https://github.com/talkincode/sshmcp/compare/v0.0.6...v0.0.7
+[0.0.6]: https://github.com/talkincode/sshmcp/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/talkincode/sshmcp/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/talkincode/sshmcp/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/talkincode/sshmcp/compare/v0.0.2...v0.0.3
