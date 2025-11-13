@@ -9,8 +9,8 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"sshx/internal/mcp"
-	"sshx/internal/sshclient"
+	"github.com/talkincode/sshx/internal/mcp"
+	"github.com/talkincode/sshx/internal/sshclient"
 )
 
 // ErrUsage is returned when only the usage information was printed.

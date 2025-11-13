@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"sshx/internal/sshclient"
+	"github.com/talkincode/sshx/internal/sshclient"
 )
 
 func TestParseArgs_BasicSSH(t *testing.T) {
