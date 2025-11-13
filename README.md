@@ -45,6 +45,10 @@ English | [简体中文](./README_CN.md)
 
 `sshx` provides a barrier-free SSH command-line client while implementing the MCP (Model Context Protocol) interface, enabling AI assistants to easily invoke remote SSH/SFTP functionality.
 
+## Why You Need It?
+
+Managing multiple servers means juggling different passwords, repeatedly entering sudo passwords, and manually executing SSH commands in AI assistants. `sshx` securely stores passwords in your system keyring, auto-fills sudo passwords, and enables AI assistants to directly operate remote servers through MCP protocol. One command, multiple servers, zero password hassle.
+
 ## Project Structure
 
 - `cmd/sshx`: Main binary entry point, responsible for command-line argument parsing, MCP mode startup, and password management features.
