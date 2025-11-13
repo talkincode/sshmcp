@@ -9,25 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- MIT License added to the project
-- Enhanced README badges with comprehensive project metrics
-- Improved ASCII logo displaying "SSHMCP"
-- Added "PRs Welcome" badge to encourage contributions
-- Added repository statistics badges (Last Commit, Repo Size)
-- Enhanced footer with quick navigation links
-- Git hooks for automatic checking mechanism
+- N/A
 
 ### Changed
 
-- Updated project description to emphasize security: "Secure SSH & SFTP Client with MCP Protocol Support"
-- Reorganized README badges into logical groups for better readability
-- Improved badge styling with consistent flat-square design
-- Enhanced license badge visibility with yellow color scheme
-- Updated project name to SSHMCP for consistency across documentation and code
+- N/A
 
 ### Fixed
 
 - N/A
+
+## [0.0.5] - 2025-11-13
+
+### Added
+
+- Professional Close error handling with CloseIgnore helper function
+- SARIF file post-processing for GitHub Code Scanning compatibility
+- Enhanced CI workflow with improved error handling
+
+### Changed
+
+- Updated Go version to 1.24 across all CI workflows
+- Upgraded CodeQL action from v2 to v3
+- Upgraded golangci-lint to v1.62.2
+- Simplified golangci-lint configuration for v2 compatibility
+- Removed Windows from test matrix to improve CI performance
+
+### Fixed
+
+- Resolved all 31 golangci-lint errors for code quality
+- Fixed SARIF file format to comply with GitHub Code Scanning requirements
+- Added permission handling for SARIF file post-processing
+- Fixed Windows PowerShell parsing issue by forcing bash shell in tests
+- Fixed module path and dependency issues
 
 ## [0.0.4] - 2025-11-13
 
@@ -66,7 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD workflow and automated release process
 - Tag creation script
 
-[Unreleased]: https://github.com/talkincode/sshmcp/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/talkincode/sshmcp/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/talkincode/sshmcp/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/talkincode/sshmcp/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/talkincode/sshmcp/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/talkincode/sshmcp/compare/v0.0.1...v0.0.2
