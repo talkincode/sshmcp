@@ -130,19 +130,28 @@ func AddHost(settings *Settings, host HostConfig) error {
 		return err
 	}
 
-	// Check for duplicate host names
-	for _, h := range settings.Hosts {
-		if h.Name == host.Name {
-			return fmt.Errorf("host with name '%s' already exists", host.Name)
-		}
-	}
-
-	// Set default values
+	// Set default values before checking duplicates
 	if host.Port == "" {
 		host.Port = "22"
 	}
 	if host.User == "" {
 		host.User = "master"
+	}
+
+	// Check for duplicate host names and host+port combinations
+	for _, h := range settings.Hosts {
+		if h.Name == host.Name {
+			return fmt.Errorf("host with name '%s' already exists", host.Name)
+		}
+
+		// Check for duplicate host+port combination
+		existingPort := h.Port
+		if existingPort == "" {
+			existingPort = "22"
+		}
+		if h.Host == host.Host && existingPort == host.Port {
+			return fmt.Errorf("host with address '%s:%s' already exists (name: '%s')", host.Host, host.Port, h.Name)
+		}
 	}
 
 	// Add host to settings
@@ -177,6 +186,31 @@ func UpdateHost(settings *Settings, host HostConfig) error {
 	// Validate host configuration
 	if err := ValidateHostConfig(&host); err != nil {
 		return err
+	}
+
+	// Set default values before checking duplicates
+	if host.Port == "" {
+		host.Port = "22"
+	}
+	if host.User == "" {
+		host.User = "master"
+	}
+
+	// Check for duplicate host+port combination (excluding the host being updated)
+	for _, h := range settings.Hosts {
+		// Skip the host being updated
+		if h.Name == host.Name {
+			continue
+		}
+
+		// Check for duplicate host+port combination
+		existingPort := h.Port
+		if existingPort == "" {
+			existingPort = "22"
+		}
+		if h.Host == host.Host && existingPort == host.Port {
+			return fmt.Errorf("host with address '%s:%s' already exists (name: '%s')", host.Host, host.Port, h.Name)
+		}
 	}
 
 	// Find and update host

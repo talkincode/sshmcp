@@ -383,22 +383,6 @@ func defineMCPTools() []MCPTool {
 				Required: []string{"name"},
 			},
 		},
-		{
-			Name:        "host_import",
-			Description: "Import hosts from ~/.ssh/config",
-			InputSchema: ToolSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"overwrite": {
-						Type:        "string",
-						Description: "Overwrite existing hosts",
-						Enum:        []string{"true", "false"},
-						Default:     "false",
-					},
-				},
-				Required: []string{},
-			},
-		},
 	}
 }
 
@@ -549,7 +533,7 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 		return s.executeScript(config, args)
 	case "pool_stats":
 		return s.getPoolStats()
-	case "host_add", "host_list", "host_test", "host_remove", "host_import":
+	case "host_add", "host_list", "host_test", "host_remove":
 		return "", fmt.Errorf("host management tools are not yet implemented in MCP mode (circular dependency issue - will be fixed in next version)")
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)

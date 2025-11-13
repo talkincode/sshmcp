@@ -100,7 +100,10 @@ func Run(args []string) (err error) {
 
 	// Handle SSH command execution
 	if err = client.ExecuteCommand(); err != nil {
-		return fmt.Errorf("failed to execute command: %w", err)
+		// EOF is a normal session close signal, not an error
+		if err.Error() != "EOF" {
+			return fmt.Errorf("failed to execute command: %w", err)
+		}
 	}
 
 	return nil

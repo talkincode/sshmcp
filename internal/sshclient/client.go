@@ -313,10 +313,13 @@ func (c *SSHClient) executeWithPTY(session *ssh.Session) error {
 	log.Printf("Executing (with PTY): %s", c.config.Command)
 
 	if err := session.Run(c.config.Command); err != nil {
-		if stderr.Len() > 0 {
-			fmt.Fprintf(os.Stderr, "STDERR:\n%s", stderr.String())
+		// EOF is normal when session closes after command execution
+		if err.Error() != "EOF" {
+			if stderr.Len() > 0 {
+				fmt.Fprintf(os.Stderr, "STDERR:\n%s", stderr.String())
+			}
+			return fmt.Errorf("command failed: %w", err)
 		}
-		return fmt.Errorf("command failed: %w", err)
 	}
 
 	if stdout.Len() > 0 {

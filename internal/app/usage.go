@@ -17,7 +17,7 @@ Usage:
   sshx --password-delete=<key>                    # Delete password from keyring
   sshx --password-list                            # List common password keys
   sshx --host-add                                 # Add host configuration
-  sshx --host-import                              # Import hosts from ~/.ssh/config
+  sshx --host-update                              # Update host configuration
   sshx --host-list                                # List configured hosts
   sshx --host-test=<name>                         # Test host connection
   sshx --host-remove=<name>                       # Remove host configuration
@@ -80,13 +80,13 @@ Password Management (Cross-Platform):
 
 Host Management:
   --host-add                          Add new host (interactive or with options)
-  --host-import                       Import hosts from ~/.ssh/config
+  --host-update                       Update existing host configuration
   --host-list                         List all configured hosts (alias: --host-ls)
   --host-test=<name>                  Test connection to configured host
   --host-remove=<name>                Remove host from configuration (alias: --host-rm)
 
-  Host Add Options (used with --host-add):
-    --host-name=<name>                Host name (unique identifier)
+  Host Add/Update Options:
+    --host-name=<name>                Host name (unique identifier, required for update)
     --host-desc=<description>         Host description
     -h=<address>                      Host address (IP or hostname)
     -p=<port>                         SSH port
@@ -186,11 +186,14 @@ Host Management Examples:
   # Add host with command line options
   sshx --host-add --host-name=prod-web -h=192.168.1.100 -u=root -pk=prod-web --host-desc="Production Web Server"
 
-  # Import hosts from ~/.ssh/config
-  sshx --host-import
+  # Update host IP address
+  sshx --host-update --host-name=prod-web -h=192.168.1.101
 
-  # Import and overwrite existing hosts
-  sshx --host-import --force
+  # Update host password key
+  sshx --host-update --host-name=prod-web -pk=new-password-key
+
+  # Update multiple fields
+  sshx --host-update --host-name=prod-web -h=192.168.1.101 -u=admin -pk=new-key
 
   # List all configured hosts
   sshx --host-list

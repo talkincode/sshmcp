@@ -185,6 +185,30 @@ func TestAddHost(t *testing.T) {
 		t.Error("AddHost() should return error for duplicate host name")
 	}
 
+	// Test adding duplicate host+port combination with different name
+	host2 := HostConfig{
+		Name: "host2",
+		Host: "192.168.1.100", // Same IP
+		Port: "22",            // Same port (or default)
+	}
+	if err := AddHost(settings, host2); err == nil {
+		t.Error("AddHost() should return error for duplicate host+port combination")
+	}
+
+	// Test adding same host but different port (should succeed)
+	host3 := HostConfig{
+		Name: "host3",
+		Host: "192.168.1.100", // Same IP
+		Port: "2222",          // Different port
+	}
+	if err := AddHost(settings, host3); err != nil {
+		t.Errorf("AddHost() should allow same host with different port, got error: %v", err)
+	}
+
+	if len(settings.Hosts) != 2 {
+		t.Errorf("Expected 2 hosts (host1 and host3), got %d", len(settings.Hosts))
+	}
+
 	// Test adding invalid host
 	invalidHost := HostConfig{
 		Name: "invalid",
@@ -250,6 +274,7 @@ func TestUpdateHost(t *testing.T) {
 	settings := &Settings{
 		Hosts: []HostConfig{
 			{Name: "host1", Host: "192.168.1.100", Port: "22"},
+			{Name: "host2", Host: "192.168.1.101", Port: "22"},
 		},
 	}
 
@@ -273,9 +298,29 @@ func TestUpdateHost(t *testing.T) {
 		t.Errorf("Port not updated, got %s", host.Port)
 	}
 
+	// Test updating to duplicate host+port combination
+	duplicateUpdate := HostConfig{
+		Name: "host1",
+		Host: "192.168.1.101", // Same as host2
+		Port: "22",            // Same as host2
+	}
+	if err := UpdateHost(settings, duplicateUpdate); err == nil {
+		t.Error("UpdateHost() should return error when updating to duplicate host+port combination")
+	}
+
+	// Test updating to same host with different port (should succeed)
+	validUpdate := HostConfig{
+		Name: "host1",
+		Host: "192.168.1.101", // Same as host2
+		Port: "2222",          // Different port
+	}
+	if err := UpdateHost(settings, validUpdate); err != nil {
+		t.Errorf("UpdateHost() should allow same host with different port, got error: %v", err)
+	}
+
 	// Update non-existent host
 	nonExistentHost := HostConfig{
-		Name: "host2",
+		Name: "host3",
 		Host: "192.168.1.201",
 	}
 	if err := UpdateHost(settings, nonExistentHost); err == nil {

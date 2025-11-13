@@ -15,8 +15,8 @@ func HandleHostManagement(config *sshclient.Config) error {
 	switch config.HostAction {
 	case "add":
 		return handleHostAdd(config)
-	case "import":
-		return handleHostImport(config)
+	case "update":
+		return handleHostUpdate(config)
 	case "list":
 		return handleHostList(config)
 	case "test":
@@ -119,20 +119,82 @@ func handleHostAdd(config *sshclient.Config) error {
 	return nil
 }
 
-// handleHostImport imports hosts from SSH config
-func handleHostImport(config *sshclient.Config) error {
+// handleHostUpdate updates an existing host in settings
+func handleHostUpdate(config *sshclient.Config) error {
 	// Load settings
 	settings, err := LoadSettings()
 	if err != nil {
 		return fmt.Errorf("failed to load settings: %w", err)
 	}
 
-	log.Println("Importing hosts from ~/.ssh/config...")
+	// Host name is required for update
+	if config.HostName == "" {
+		return fmt.Errorf("host name is required for update (use --host-name=<name>)")
+	}
 
-	// Import hosts
-	imported, err := ImportFromSSHConfig(settings, config.Force)
+	// Check if host exists
+	_, err = GetHost(settings, config.HostName)
 	if err != nil {
-		return fmt.Errorf("failed to import hosts: %w", err)
+		return fmt.Errorf("host '%s' not found, use --host-add to create it", config.HostName)
+	}
+
+	// Build updated host config
+	host := HostConfig{
+		Name: config.HostName,
+	}
+
+	// Update fields if provided, otherwise keep existing values
+	existingHost, err := GetHost(settings, config.HostName)
+	if err != nil {
+		// If host doesn't exist, we'll create it with only the provided fields
+		existingHost = &HostConfig{}
+	}
+
+	if config.Host != "" {
+		host.Host = config.Host
+	} else {
+		host.Host = existingHost.Host
+	}
+
+	if config.HostDescription != "" {
+		host.Description = config.HostDescription
+	} else {
+		host.Description = existingHost.Description
+	}
+
+	if config.Port != "" && config.Port != "22" {
+		host.Port = config.Port
+	} else if existingHost.Port != "" {
+		host.Port = existingHost.Port
+	} else {
+		host.Port = "22"
+	}
+
+	if config.User != "" && config.User != "master" {
+		host.User = config.User
+	} else if existingHost.User != "" {
+		host.User = existingHost.User
+	} else {
+		host.User = "master"
+	}
+
+	if config.SudoKey != "" && config.SudoKey != sshclient.DefaultSudoKey {
+		host.PasswordKey = config.SudoKey
+	} else if existingHost.PasswordKey != "" {
+		host.PasswordKey = existingHost.PasswordKey
+	}
+
+	if config.HostType != "" {
+		host.Type = config.HostType
+	} else if existingHost.Type != "" {
+		host.Type = existingHost.Type
+	} else {
+		host.Type = "linux"
+	}
+
+	// Update host
+	if err := UpdateHost(settings, host); err != nil {
+		return fmt.Errorf("failed to update host: %w", err)
 	}
 
 	// Save settings
@@ -140,7 +202,7 @@ func handleHostImport(config *sshclient.Config) error {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 
-	log.Printf("✓ Successfully imported %d host(s)", imported)
+	log.Printf("✓ Host '%s' updated successfully", host.Name)
 	return nil
 }
 
@@ -158,7 +220,6 @@ func handleHostList(config *sshclient.Config) error {
 		fmt.Println("No hosts configured.")
 		fmt.Println("\nTo add hosts:")
 		fmt.Println("  - Interactive: sshx --host-add")
-		fmt.Println("  - Import: sshx --host-import")
 		return nil
 	}
 
@@ -178,7 +239,7 @@ func handleHostList(config *sshclient.Config) error {
 			fmt.Printf("    User:        %s\n", host.User)
 		}
 		if host.PasswordKey != "" {
-			fmt.Printf("    Password:    %s\n", host.PasswordKey)
+			fmt.Printf("    Password Key: %s\n", host.PasswordKey)
 		}
 		if host.Type != "" {
 			fmt.Printf("    Type:        %s\n", host.Type)

@@ -111,9 +111,9 @@ func ParseArgs(args []string) *sshclient.Config {
 		case arg == "--host-add":
 			config.Mode = "host"
 			config.HostAction = "add"
-		case arg == "--host-import":
+		case arg == "--host-update":
 			config.Mode = "host"
-			config.HostAction = "import"
+			config.HostAction = "update"
 		case arg == "--host-list" || arg == "--host-ls":
 			config.Mode = "host"
 			config.HostAction = "list"
