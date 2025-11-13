@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/talkincode/sshx/internal/sshclient"
+	"github.com/talkincode/sshmcp/internal/sshclient"
 )
 
 // ParseArgs parses command-line arguments and returns a Config.

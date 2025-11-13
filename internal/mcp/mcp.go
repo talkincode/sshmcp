@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/talkincode/sshx/internal/sshclient"
+	"github.com/talkincode/sshmcp/internal/sshclient"
 )
 
 // MCP Protocol types
