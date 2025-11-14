@@ -102,7 +102,7 @@ func TestReleaseConnection(t *testing.T) {
 
 	assert.NotNil(t, conn)
 	conn.mu.Lock()
-	assert.False(t, conn.inUse)
+	// Note: inUse is no longer used for exclusive locking since SSH supports multiple sessions
 	assert.WithinDuration(t, time.Now(), conn.lastUsed, 2*time.Second)
 	conn.mu.Unlock()
 }
@@ -178,8 +178,8 @@ func TestStats(t *testing.T) {
 	stats := pool.Stats()
 
 	assert.Equal(t, 2, stats["total_connections"])
-	assert.Equal(t, 1, stats["active_connections"])
-	assert.Equal(t, 1, stats["idle_connections"])
+	assert.Equal(t, 2, stats["recently_used_connections"]) // Both connections are recently used
+	assert.Equal(t, 0, stats["idle_connections"])
 	assert.Equal(t, "5m0s", stats["max_idle_duration"])
 	assert.Equal(t, "30s", stats["health_check_interval"])
 }
@@ -190,7 +190,7 @@ func TestStats_EmptyPool(t *testing.T) {
 	stats := pool.Stats()
 
 	assert.Equal(t, 0, stats["total_connections"])
-	assert.Equal(t, 0, stats["active_connections"])
+	assert.Equal(t, 0, stats["recently_used_connections"])
 	assert.Equal(t, 0, stats["idle_connections"])
 }
 

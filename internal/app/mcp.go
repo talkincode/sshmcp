@@ -609,8 +609,8 @@ func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interfa
 	}
 	defer errutil.HandleCloseError(&err, client)
 
-	// 使用直接连接而不是连接池，避免连接复用导致的问题
-	if err = client.ConnectDirect(); err != nil {
+	// 使用连接池来复用连接，提高性能
+	if err = client.Connect(); err != nil {
 		return "", fmt.Errorf("failed to connect: %w", err)
 	}
 
@@ -912,11 +912,11 @@ func (s *MCPServer) getPoolStats() (string, error) {
 	var output strings.Builder
 	output.WriteString("SSH Connection Pool Statistics:\n")
 	output.WriteString("================================\n")
-	output.WriteString(fmt.Sprintf("Total Connections:  %v\n", stats["total_connections"]))
-	output.WriteString(fmt.Sprintf("Active Connections: %v\n", stats["active_connections"]))
-	output.WriteString(fmt.Sprintf("Idle Connections:   %v\n", stats["idle_connections"]))
-	output.WriteString(fmt.Sprintf("Max Idle Duration:  %v\n", stats["max_idle_duration"]))
-	output.WriteString(fmt.Sprintf("Health Check Interval: %v\n", stats["health_check_interval"]))
+	output.WriteString(fmt.Sprintf("Total Connections:      %v\n", stats["total_connections"]))
+	output.WriteString(fmt.Sprintf("Recently Used:          %v\n", stats["recently_used_connections"]))
+	output.WriteString(fmt.Sprintf("Idle Connections:       %v\n", stats["idle_connections"]))
+	output.WriteString(fmt.Sprintf("Max Idle Duration:      %v\n", stats["max_idle_duration"]))
+	output.WriteString(fmt.Sprintf("Health Check Interval:  %v\n", stats["health_check_interval"]))
 
 	return output.String(), nil
 }

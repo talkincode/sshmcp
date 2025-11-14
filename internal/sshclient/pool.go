@@ -59,6 +59,7 @@ func NewConnectionPool() *ConnectionPool {
 // GetConnection retrieves or creates a connection from the pool
 func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 	key := p.makeKey(config)
+	lg := logger.GetLogger()
 
 	p.mu.Lock()
 	pooledConn, exists := p.connections[key]
@@ -68,14 +69,17 @@ func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 		if p.isConnectionAlive(pooledConn.client) {
 			pooledConn.mu.Lock()
 			pooledConn.lastUsed = time.Now()
-			pooledConn.inUse = true
+			// Note: SSH connections can handle multiple concurrent sessions
+			// so we don't need to mark as "inUse" in an exclusive way
 			pooledConn.retryCount = 0 // Reset retry count
 			pooledConn.mu.Unlock()
 			p.mu.Unlock()
+			lg.Debug("🔄 Reusing existing connection from pool for %s", key)
 			return pooledConn.client, nil
 		}
 
 		// Connection is invalid, remove and recreate
+		lg.Debug("❌ Connection invalid, removing from pool for %s", key)
 		pooledConn.mu.Lock()
 		if pooledConn.client != nil {
 			_ = errutil.SafeClose(pooledConn.client) //nolint:errcheck
@@ -85,6 +89,7 @@ func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 	}
 	p.mu.Unlock()
 
+	lg.Debug("➕ Creating new connection for pool key %s", key)
 	// Create new connection with retry mechanism
 	client, err := p.createConnectionWithRetry(config)
 	if err != nil {
@@ -96,18 +101,19 @@ func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 		client:     client,
 		config:     config,
 		lastUsed:   time.Now(),
-		inUse:      true,
+		inUse:      false, // SSH connections can handle multiple sessions
 		retryCount: 0,
 	}
 
 	p.mu.Lock()
 	p.connections[key] = pooledConn
+	lg.Debug("✅ Added new connection to pool, total connections: %d", len(p.connections))
 	p.mu.Unlock()
 
 	return client, nil
 }
 
-// ReleaseConnection releases a connection back to the pool
+// ReleaseConnection updates the last used time for a connection
 func (p *ConnectionPool) ReleaseConnection(config *Config) {
 	key := p.makeKey(config)
 
@@ -117,7 +123,7 @@ func (p *ConnectionPool) ReleaseConnection(config *Config) {
 
 	if exists {
 		pooledConn.mu.Lock()
-		pooledConn.inUse = false
+		// Just update the last used time since SSH connections can handle multiple sessions
 		pooledConn.lastUsed = time.Now()
 		pooledConn.mu.Unlock()
 	}
@@ -203,8 +209,8 @@ func (p *ConnectionPool) cleanup() {
 	for key, pooledConn := range p.connections {
 		pooledConn.mu.Lock()
 
-		// Check if exceeded max idle time and not in use
-		if !pooledConn.inUse && now.Sub(pooledConn.lastUsed) > p.maxIdle {
+		// Check if exceeded max idle time
+		if now.Sub(pooledConn.lastUsed) > p.maxIdle {
 			toRemove = append(toRemove, key)
 		} else if !p.isConnectionAlive(pooledConn.client) {
 			// Connection is invalid
@@ -265,24 +271,24 @@ func (p *ConnectionPool) Stats() map[string]interface{} {
 	defer p.mu.RUnlock()
 
 	totalConns := len(p.connections)
-	activeConns := 0
-	idleConns := 0
+	recentlyUsed := 0
+
+	now := time.Now()
+	recentThreshold := 1 * time.Minute // Consider connections used in last minute as "active"
 
 	for _, pooledConn := range p.connections {
 		pooledConn.mu.Lock()
-		if pooledConn.inUse {
-			activeConns++
-		} else {
-			idleConns++
+		if now.Sub(pooledConn.lastUsed) < recentThreshold {
+			recentlyUsed++
 		}
 		pooledConn.mu.Unlock()
 	}
 
 	return map[string]interface{}{
-		"total_connections":     totalConns,
-		"active_connections":    activeConns,
-		"idle_connections":      idleConns,
-		"max_idle_duration":     p.maxIdle.String(),
-		"health_check_interval": p.healthCheck.String(),
+		"total_connections":         totalConns,
+		"recently_used_connections": recentlyUsed,
+		"idle_connections":          totalConns - recentlyUsed,
+		"max_idle_duration":         p.maxIdle.String(),
+		"health_check_interval":     p.healthCheck.String(),
 	}
 }

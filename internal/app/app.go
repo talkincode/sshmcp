@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -40,6 +41,12 @@ func Run(args []string) (err error) {
 	// Load environment variables
 	//nolint:errcheck // Loading .env is optional
 	_ = godotenv.Load()
+
+	// Set log level from environment variable
+	if logLevelStr := os.Getenv("SSHX_LOG_LEVEL"); logLevelStr != "" {
+		logLevel := logger.LogLevelFromString(logLevelStr)
+		logger.GetLogger().SetLevel(logLevel)
+	}
 
 	// Parse command-line arguments
 	config := ParseArgs(args)
@@ -86,8 +93,8 @@ func Run(args []string) (err error) {
 	}
 	defer errutil.HandleCloseError(&err, client)
 
-	// Connect to remote host
-	if err = client.Connect(); err != nil {
+	// Connect to remote host (use direct connection for CLI mode, no need for pooling)
+	if err = client.ConnectDirect(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
 

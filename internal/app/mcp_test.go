@@ -128,7 +128,7 @@ func TestGetPoolStats(t *testing.T) {
 	assert.NotEmpty(t, result)
 	assert.Contains(t, result, "SSH Connection Pool Statistics")
 	assert.Contains(t, result, "Total Connections:")
-	assert.Contains(t, result, "Active Connections:")
+	assert.Contains(t, result, "Recently Used:")
 	assert.Contains(t, result, "Idle Connections:")
 }
 

@@ -175,7 +175,7 @@ func (c *SSHClient) ConnectDirect() error {
 			signer, signerErr := ssh.ParsePrivateKey(key)
 			if signerErr == nil {
 				authMethods = append(authMethods, ssh.PublicKeys(signer))
-				lg.Info("Using SSH key: %s", keyPath)
+				lg.Debug("Using SSH key: %s", keyPath)
 			} else {
 				lg.Warning("failed to parse SSH key: %v", signerErr)
 			}
@@ -186,7 +186,7 @@ func (c *SSHClient) ConnectDirect() error {
 
 	if c.config.Password != "" {
 		authMethods = append(authMethods, ssh.Password(c.config.Password))
-		lg.Info("Using password authentication")
+		lg.Debug("Using password authentication")
 	}
 
 	if len(authMethods) == 0 {
@@ -201,7 +201,7 @@ func (c *SSHClient) ConnectDirect() error {
 	}
 
 	addr := fmt.Sprintf("%s:%s", c.config.Host, c.config.Port)
-	lg.Info("Connecting to %s@%s...", c.config.User, addr)
+	lg.Debug("Connecting to %s@%s...", c.config.User, addr)
 
 	client, err := ssh.Dial("tcp", addr, sshConfig)
 	if err != nil {
@@ -209,7 +209,7 @@ func (c *SSHClient) ConnectDirect() error {
 	}
 
 	c.client = client
-	lg.Success("Connected successfully")
+	lg.Debug("Connected successfully")
 	return nil
 }
 
@@ -320,7 +320,7 @@ func (c *SSHClient) executeWithPTY(session *ssh.Session) error {
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	lg.Info("Executing (with PTY): %s", c.config.Command)
+	lg.Debug("Executing (with PTY): %s", c.config.Command)
 
 	if err := session.Run(c.config.Command); err != nil && !errutil.IsEOFError(err) {
 		// Only report non-EOF errors
@@ -347,7 +347,7 @@ func (c *SSHClient) executeNormal(session *ssh.Session) error {
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	lg.Info("Executing: %s", c.config.Command)
+	lg.Debug("Executing: %s", c.config.Command)
 
 	if err := session.Run(c.config.Command); err != nil {
 		if stderr.Len() > 0 {
@@ -383,7 +383,7 @@ func (c *SSHClient) executeInteractive(session *ssh.Session) error {
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	lg.Info("Executing (no PTY): %s", "sudo command")
+	lg.Debug("Executing (no PTY): %s", "sudo command")
 
 	if err := session.Run(finalCmd); err != nil {
 		if stderr.Len() > 0 {
