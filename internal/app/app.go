@@ -11,6 +11,8 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/talkincode/sshmcp/internal/sshclient"
+	"github.com/talkincode/sshmcp/pkg/errutil"
+	"github.com/talkincode/sshmcp/pkg/logger"
 )
 
 // ErrUsage is returned when only the usage information was printed.
@@ -61,7 +63,7 @@ func Run(args []string) (err error) {
 	// Try to resolve host from settings if not an IP address
 	if config.Host != "" && !isIPAddress(config.Host) {
 		if resolveErr := resolveHostFromSettings(config); resolveErr != nil {
-			log.Printf("Note: Could not find host '%s' in settings, using as hostname directly", config.Host)
+			logger.GetLogger().Info("Note: Could not find host '%s' in settings, using as hostname directly", config.Host)
 		}
 	}
 
@@ -69,11 +71,11 @@ func Run(args []string) (err error) {
 	if strings.Contains(config.Command, "sudo") && config.SudoKey != "" {
 		password, pwdErr := sshclient.GetSudoPassword(config.SudoKey)
 		if pwdErr != nil {
-			log.Printf("Warning: failed to get sudo password from keyring: %v", pwdErr)
-			log.Println("Continuing without sudo password auto-fill...")
+			logger.GetLogger().Warning("failed to get sudo password from keyring: %v", pwdErr)
+			logger.GetLogger().Info("Continuing without sudo password auto-fill...")
 		} else {
 			config.Password = password
-			log.Printf("✓ Sudo password will be auto-filled when prompted")
+			logger.GetLogger().Success("Sudo password will be auto-filled when prompted")
 		}
 	}
 
@@ -82,7 +84,7 @@ func Run(args []string) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to create SSH client: %w", err)
 	}
-	defer sshclient.CloseIgnore(&err, client)
+	defer errutil.HandleCloseError(&err, client)
 
 	// Connect to remote host
 	if err = client.Connect(); err != nil {
@@ -100,7 +102,7 @@ func Run(args []string) (err error) {
 	// Handle SSH command execution
 	if err = client.ExecuteCommand(); err != nil {
 		// EOF is a normal session close signal, not an error
-		if err.Error() != "EOF" {
+		if !errutil.IsEOFError(err) {
 			return fmt.Errorf("failed to execute command: %w", err)
 		}
 	}
@@ -127,7 +129,7 @@ func resolveHostFromSettings(config *sshclient.Config) error {
 		return err
 	}
 
-	log.Printf("✓ Found host '%s' in settings", config.Host)
+	logger.GetLogger().Success("Found host '%s' in settings", config.Host)
 
 	// Update config with host settings
 	config.Host = hostConfig.Host
@@ -145,13 +147,13 @@ func resolveHostFromSettings(config *sshclient.Config) error {
 	// Use configured password key if available
 	if hostConfig.PasswordKey != "" && config.SudoKey == sshclient.DefaultSudoKey {
 		config.SudoKey = hostConfig.PasswordKey
-		log.Printf("✓ Using password key: %s", hostConfig.PasswordKey)
+		logger.GetLogger().Success("Using password key: %s", hostConfig.PasswordKey)
 	}
 
 	// Use default SSH key from settings if available
 	if config.KeyPath == "" && settings.Key != "" {
 		config.KeyPath = settings.Key
-		log.Printf("✓ Using SSH key: %s", settings.Key)
+		logger.GetLogger().Success("Using SSH key: %s", settings.Key)
 	}
 
 	return nil

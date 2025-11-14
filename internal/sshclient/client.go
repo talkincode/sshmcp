@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -12,6 +11,8 @@ import (
 	"time"
 
 	"github.com/pkg/sftp"
+	"github.com/talkincode/sshmcp/pkg/errutil"
+	"github.com/talkincode/sshmcp/pkg/logger"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
@@ -64,9 +65,10 @@ type SSHClient struct {
 // getHostKeyCallback returns a secure host key callback function
 // It tries to use known_hosts file, falls back to InsecureIgnoreHostKey with warning
 func getHostKeyCallback() ssh.HostKeyCallback {
+	lg := logger.GetLogger()
 	home, err := os.UserHomeDir()
 	if err != nil {
-		log.Printf("⚠️  Warning: Unable to get home directory, using insecure host key verification")
+		lg.Warning("Unable to get home directory, using insecure host key verification")
 		// #nosec G106 -- This is a fallback when known_hosts is unavailable
 		return ssh.InsecureIgnoreHostKey()
 	}
@@ -78,12 +80,12 @@ func getHostKeyCallback() ssh.HostKeyCallback {
 	if err != nil {
 		// If known_hosts doesn't exist or can't be read, create it or use insecure mode
 		if os.IsNotExist(err) {
-			log.Printf("⚠️  Warning: known_hosts file not found at %s", knownHostsPath)
-			log.Printf("⚠️  Using insecure host key verification (vulnerable to MITM attacks)")
-			log.Printf("💡 Tip: Run 'ssh-keyscan %s >> %s' to add host keys", "HOST", knownHostsPath)
+			lg.Warning("known_hosts file not found at %s", knownHostsPath)
+			lg.Warning("Using insecure host key verification (vulnerable to MITM attacks)")
+			lg.Tip("Run 'ssh-keyscan %s >> %s' to add host keys", "HOST", knownHostsPath)
 		} else {
-			log.Printf("⚠️  Warning: Failed to load known_hosts: %v", err)
-			log.Printf("⚠️  Using insecure host key verification")
+			lg.Warning("Failed to load known_hosts: %v", err)
+			lg.Warning("Using insecure host key verification")
 		}
 		// #nosec G106 -- Documented fallback with user warning
 		return ssh.InsecureIgnoreHostKey()
@@ -143,6 +145,7 @@ func NewSSHClient(config *Config) (*SSHClient, error) {
 
 // Connect establishes an SSH connection (prefers using connection pool)
 func (c *SSHClient) Connect() error {
+	lg := logger.GetLogger()
 	pool := GetConnectionPool()
 	client, err := pool.GetConnection(c.config)
 	if err == nil {
@@ -150,12 +153,13 @@ func (c *SSHClient) Connect() error {
 		return nil
 	}
 
-	log.Printf("Connection pool failed, falling back to direct connection: %v", err)
+	lg.Debug("Connection pool failed, falling back to direct connection: %v", err)
 	return c.ConnectDirect()
 }
 
 // ConnectDirect establishes a direct SSH connection (without using connection pool)
 func (c *SSHClient) ConnectDirect() error {
+	lg := logger.GetLogger()
 	var authMethods []ssh.AuthMethod
 
 	if c.config.KeyPath != "" {
@@ -171,18 +175,18 @@ func (c *SSHClient) ConnectDirect() error {
 			signer, signerErr := ssh.ParsePrivateKey(key)
 			if signerErr == nil {
 				authMethods = append(authMethods, ssh.PublicKeys(signer))
-				log.Printf("Using SSH key: %s", keyPath)
+				lg.Info("Using SSH key: %s", keyPath)
 			} else {
-				log.Printf("Warning: failed to parse SSH key: %v", signerErr)
+				lg.Warning("failed to parse SSH key: %v", signerErr)
 			}
 		} else {
-			log.Printf("Warning: failed to read SSH key file %s: %v", keyPath, err)
+			lg.Warning("failed to read SSH key file %s: %v", keyPath, err)
 		}
 	}
 
 	if c.config.Password != "" {
 		authMethods = append(authMethods, ssh.Password(c.config.Password))
-		log.Println("Using password authentication")
+		lg.Info("Using password authentication")
 	}
 
 	if len(authMethods) == 0 {
@@ -197,7 +201,7 @@ func (c *SSHClient) ConnectDirect() error {
 	}
 
 	addr := fmt.Sprintf("%s:%s", c.config.Host, c.config.Port)
-	log.Printf("Connecting to %s@%s...", c.config.User, addr)
+	lg.Info("Connecting to %s@%s...", c.config.User, addr)
 
 	client, err := ssh.Dial("tcp", addr, sshConfig)
 	if err != nil {
@@ -205,36 +209,38 @@ func (c *SSHClient) ConnectDirect() error {
 	}
 
 	c.client = client
-	log.Println("✓ Connected successfully")
+	lg.Success("Connected successfully")
 	return nil
 }
 
 // ExecuteCommand executes a command
 func (c *SSHClient) ExecuteCommand() (err error) {
+	lg := logger.GetLogger()
+
 	if c.config.SafetyCheck && !c.config.Force {
 		if validateErr := ValidateCommand(c.config.Command); validateErr != nil {
 			return validateErr
 		}
 	} else if c.config.Force {
-		log.Println("⚠️  Safety check skipped (--force mode)")
+		lg.Warning("Safety check skipped (--force mode)")
 	}
 
 	session, err := c.client.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
-	// Ignore EOF error when closing PTY session
-	defer CloseIgnore(&err, session, io.EOF)
+	// Use new error handling mechanism that automatically ignores common errors like EOF
+	defer errutil.HandleCloseError(&err, session)
 
 	if c.config.Password != "" && strings.Contains(c.config.Command, "sudo") {
 		return c.executeInteractive(session)
 	}
 
 	return c.executeWithPTY(session)
-}
-
-// ExecuteCommandWithOutput executes a command and returns the output
+} // ExecuteCommandWithOutput executes a command and returns the output
 func (c *SSHClient) ExecuteCommandWithOutput() (output string, err error) {
+	lg := logger.GetLogger()
+
 	if c.config.SafetyCheck && !c.config.Force {
 		if validateErr := ValidateCommand(c.config.Command); validateErr != nil {
 			return "", validateErr
@@ -245,8 +251,8 @@ func (c *SSHClient) ExecuteCommandWithOutput() (output string, err error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	// Ignore EOF error when closing PTY session
-	defer CloseIgnore(&err, session, io.EOF)
+	// Use new error handling mechanism
+	defer errutil.HandleCloseError(&err, session)
 
 	// Request PTY for better compatibility (like ExecuteCommand does)
 	modes := ssh.TerminalModes{
@@ -257,7 +263,7 @@ func (c *SSHClient) ExecuteCommandWithOutput() (output string, err error) {
 
 	if ptyErr := session.RequestPty("xterm", 80, 40, modes); ptyErr != nil {
 		// PTY request failed, try without it
-		log.Printf("Warning: failed to request PTY: %v", ptyErr)
+		lg.Warning("failed to request PTY: %v", ptyErr)
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -275,41 +281,17 @@ func (c *SSHClient) ExecuteCommandWithOutput() (output string, err error) {
 		execErr = session.Run(c.config.Command)
 	}
 
-	// Build detailed output regardless of success/failure
+	// Build output
 	output = stdout.String()
 	stderrStr := stderr.String()
 
+	// Use enhanced error handling
 	if execErr != nil {
-		// EOF is a normal session close signal when using PTY, check if we got output
-		if execErr.Error() == "EOF" {
-			if output != "" || stderrStr != "" {
-				// Command executed successfully, EOF is just session termination
-				if stderrStr != "" {
-					output += "\n--- STDERR ---\n" + stderrStr
-				}
-				return output, nil
-			}
-			// EOF with no output means connection/authentication failed
-			return "", fmt.Errorf("connection closed unexpectedly (EOF) - check SSH key or password")
+		enhancedErr := errutil.EnhanceError(execErr, output, stderrStr)
+		if enhancedErr != nil {
+			return "", enhancedErr
 		}
-
-		// Build comprehensive error message
-		errMsg := fmt.Sprintf("command failed: %v", execErr)
-
-		if stderrStr != "" {
-			errMsg += fmt.Sprintf("\nStderr: %s", stderrStr)
-		}
-
-		if output != "" {
-			errMsg += fmt.Sprintf("\nStdout: %s", output)
-		}
-
-		// Include exit code if available
-		if exitErr, ok := execErr.(*ssh.ExitError); ok {
-			errMsg += fmt.Sprintf("\nExit Code: %d", exitErr.ExitStatus())
-		}
-
-		return "", fmt.Errorf("%s", errMsg)
+		// If EnhanceError returns nil, it means EOF with output (success)
 	}
 
 	// For successful execution, include stderr in output if present
@@ -322,6 +304,7 @@ func (c *SSHClient) ExecuteCommandWithOutput() (output string, err error) {
 
 // executeWithPTY executes a command using PTY
 func (c *SSHClient) executeWithPTY(session *ssh.Session) error {
+	lg := logger.GetLogger()
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          0,
 		ssh.TTY_OP_ISPEED: 14400,
@@ -329,7 +312,7 @@ func (c *SSHClient) executeWithPTY(session *ssh.Session) error {
 	}
 
 	if err := session.RequestPty("xterm", 80, 40, modes); err != nil {
-		log.Printf("Warning: failed to request PTY, falling back to normal execution: %v", err)
+		lg.Warning("failed to request PTY, falling back to normal execution: %v", err)
 		return c.executeNormal(session)
 	}
 
@@ -337,16 +320,14 @@ func (c *SSHClient) executeWithPTY(session *ssh.Session) error {
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	log.Printf("Executing (with PTY): %s", c.config.Command)
+	lg.Info("Executing (with PTY): %s", c.config.Command)
 
-	if err := session.Run(c.config.Command); err != nil {
-		// EOF is normal when session closes after command execution
-		if err.Error() != "EOF" {
-			if stderr.Len() > 0 {
-				fmt.Fprintf(os.Stderr, "STDERR:\n%s", stderr.String())
-			}
-			return fmt.Errorf("command failed: %w", err)
+	if err := session.Run(c.config.Command); err != nil && !errutil.IsEOFError(err) {
+		// Only report non-EOF errors
+		if stderr.Len() > 0 {
+			fmt.Fprintf(os.Stderr, "STDERR:\n%s", stderr.String())
 		}
+		return fmt.Errorf("command failed: %w", err)
 	}
 
 	if stdout.Len() > 0 {
@@ -361,11 +342,12 @@ func (c *SSHClient) executeWithPTY(session *ssh.Session) error {
 
 // executeNormal executes a normal command (without PTY)
 func (c *SSHClient) executeNormal(session *ssh.Session) error {
+	lg := logger.GetLogger()
 	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	log.Printf("Executing: %s", c.config.Command)
+	lg.Info("Executing: %s", c.config.Command)
 
 	if err := session.Run(c.config.Command); err != nil {
 		if stderr.Len() > 0 {
@@ -386,9 +368,10 @@ func (c *SSHClient) executeNormal(session *ssh.Session) error {
 
 // executeInteractive executes an interactive command (supports auto sudo password input)
 func (c *SSHClient) executeInteractive(session *ssh.Session) error {
+	lg := logger.GetLogger()
 	var finalCmd string
 	if c.config.Password != "" {
-		log.Println("Auto-filling sudo password...")
+		lg.Info("Auto-filling sudo password...")
 		actualCmd := strings.TrimPrefix(c.config.Command, "sudo ")
 		actualCmd = strings.TrimSpace(actualCmd)
 		finalCmd = fmt.Sprintf(`printf '%%s\n' '%s' | sudo -S %s`, c.config.Password, actualCmd)
@@ -400,7 +383,7 @@ func (c *SSHClient) executeInteractive(session *ssh.Session) error {
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	log.Printf("Executing (no PTY): %s", "sudo command")
+	lg.Info("Executing (no PTY): %s", "sudo command")
 
 	if err := session.Run(finalCmd); err != nil {
 		if stderr.Len() > 0 {
@@ -425,7 +408,7 @@ func (c *SSHClient) ExecuteSftp() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to create SFTP client: %w", err)
 	}
-	defer CloseIgnore(&err, sftpClient)
+	defer errutil.HandleCloseError(&err, sftpClient)
 	c.sftpClient = sftpClient
 
 	switch c.config.SftpAction {
@@ -445,54 +428,57 @@ func (c *SSHClient) ExecuteSftp() (err error) {
 }
 
 func (c *SSHClient) uploadFile() (err error) {
+	lg := logger.GetLogger()
 	localFile, err := os.Open(c.config.LocalPath)
 	if err != nil {
 		return fmt.Errorf("failed to open local file: %w", err)
 	}
-	defer CloseIgnore(&err, localFile)
+	defer errutil.HandleCloseError(&err, localFile)
 
 	remoteFile, err := c.sftpClient.Create(c.config.RemotePath)
 	if err != nil {
 		return fmt.Errorf("failed to create remote file: %w", err)
 	}
-	defer CloseIgnore(&err, remoteFile)
+	defer errutil.HandleCloseError(&err, remoteFile)
 
-	log.Printf("Uploading: %s → %s", c.config.LocalPath, c.config.RemotePath)
+	lg.Info("Uploading: %s → %s", c.config.LocalPath, c.config.RemotePath)
 
 	written, err := io.Copy(remoteFile, localFile)
 	if err != nil {
 		return fmt.Errorf("failed to upload file: %w", err)
 	}
 
-	log.Printf("✓ Uploaded %d bytes successfully", written)
+	lg.Success("Uploaded %d bytes successfully", written)
 	return nil
 }
 
 func (c *SSHClient) downloadFile() (err error) {
+	lg := logger.GetLogger()
 	remoteFile, err := c.sftpClient.Open(c.config.RemotePath)
 	if err != nil {
 		return fmt.Errorf("failed to open remote file: %w", err)
 	}
-	defer CloseIgnore(&err, remoteFile)
+	defer errutil.HandleCloseError(&err, remoteFile)
 
 	localFile, err := os.Create(c.config.LocalPath)
 	if err != nil {
 		return fmt.Errorf("failed to create local file: %w", err)
 	}
-	defer CloseIgnore(&err, localFile)
+	defer errutil.HandleCloseError(&err, localFile)
 
-	log.Printf("Downloading: %s → %s", c.config.RemotePath, c.config.LocalPath)
+	lg.Info("Downloading: %s → %s", c.config.RemotePath, c.config.LocalPath)
 
 	written, err := io.Copy(localFile, remoteFile)
 	if err != nil {
 		return fmt.Errorf("failed to download file: %w", err)
 	}
 
-	log.Printf("✓ Downloaded %d bytes successfully", written)
+	lg.Success("Downloaded %d bytes successfully", written)
 	return nil
 }
 
 func (c *SSHClient) listFiles() error {
+	lg := logger.GetLogger()
 	remotePath := c.config.RemotePath
 	if remotePath == "" {
 		remotePath = "."
@@ -503,7 +489,7 @@ func (c *SSHClient) listFiles() error {
 		return fmt.Errorf("failed to list directory: %w", err)
 	}
 
-	log.Printf("Directory listing: %s", remotePath)
+	lg.Info("Directory listing: %s", remotePath)
 	fmt.Println("\nPermissions  Size      Modified              Name")
 	fmt.Println("-------------------------------------------------------")
 
@@ -520,15 +506,17 @@ func (c *SSHClient) listFiles() error {
 }
 
 func (c *SSHClient) makeDirectory() error {
+	lg := logger.GetLogger()
 	if err := c.sftpClient.MkdirAll(c.config.RemotePath); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	log.Printf("✓ Directory created: %s", c.config.RemotePath)
+	lg.Success("Directory created: %s", c.config.RemotePath)
 	return nil
 }
 
 func (c *SSHClient) removeFile() error {
+	lg := logger.GetLogger()
 	stat, err := c.sftpClient.Stat(c.config.RemotePath)
 	if err != nil {
 		return fmt.Errorf("failed to stat file: %w", err)
@@ -538,12 +526,12 @@ func (c *SSHClient) removeFile() error {
 		if err := c.removeDirectory(c.config.RemotePath); err != nil {
 			return err
 		}
-		log.Printf("✓ Directory removed: %s", c.config.RemotePath)
+		lg.Success("Directory removed: %s", c.config.RemotePath)
 	} else {
 		if err := c.sftpClient.Remove(c.config.RemotePath); err != nil {
 			return fmt.Errorf("failed to remove file: %w", err)
 		}
-		log.Printf("✓ File removed: %s", c.config.RemotePath)
+		lg.Success("File removed: %s", c.config.RemotePath)
 	}
 
 	return nil

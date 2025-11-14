@@ -2,9 +2,9 @@ package sshclient
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
+	"github.com/talkincode/sshmcp/pkg/logger"
 	"github.com/zalando/go-keyring"
 )
 
@@ -133,6 +133,6 @@ func GetSudoPassword(key string) (string, error) {
 		return "", fmt.Errorf("empty sudo password in keyring for key: %s", key)
 	}
 
-	log.Printf("✓ Sudo password loaded from system keyring for key: %s", key)
+	logger.GetLogger().Success("Sudo password loaded from system keyring for key: %s", key)
 	return password, nil
 }

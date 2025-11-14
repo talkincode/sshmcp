@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/talkincode/sshmcp/pkg/errutil"
+	"github.com/talkincode/sshmcp/pkg/logger"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -76,10 +78,7 @@ func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 		// Connection is invalid, remove and recreate
 		pooledConn.mu.Lock()
 		if pooledConn.client != nil {
-			if closeErr := pooledConn.client.Close(); closeErr != nil {
-				// Best-effort close, ignore error
-				_ = closeErr
-			}
+			_ = errutil.SafeClose(pooledConn.client)
 		}
 		pooledConn.mu.Unlock()
 		delete(p.connections, key)
@@ -171,10 +170,7 @@ func (p *ConnectionPool) isConnectionAlive(client *ssh.Client) bool {
 		return false
 	}
 	defer func() {
-		if closeErr := session.Close(); closeErr != nil {
-			// Best-effort close, ignore error
-			_ = closeErr
-		}
+		_ = errutil.SafeClose(session)
 	}()
 
 	// Execute a lightweight command to truly verify the connection is alive
@@ -221,37 +217,46 @@ func (p *ConnectionPool) cleanup() {
 
 	// Remove invalid connections
 	if len(toRemove) > 0 {
+		lg := logger.GetLogger()
 		p.mu.Lock()
 		for _, key := range toRemove {
 			if pooledConn, exists := p.connections[key]; exists {
 				if pooledConn.client != nil {
-					if closeErr := pooledConn.client.Close(); closeErr != nil {
-						// Best-effort close, ignore error
-						_ = closeErr
+					if err := errutil.SafeClose(pooledConn.client); err != nil {
+						lg.Debug("Failed to close pooled connection %s: %v", key, err)
 					}
 				}
 				delete(p.connections, key)
 			}
 		}
 		p.mu.Unlock()
+		lg.Debug("Cleaned up %d expired/invalid connections", len(toRemove))
 	}
 }
 
 // Close closes all connections in the pool
 func (p *ConnectionPool) Close() {
+	lg := logger.GetLogger()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	for _, pooledConn := range p.connections {
+	var errs []error
+	for key, pooledConn := range p.connections {
 		if pooledConn.client != nil {
-			if closeErr := pooledConn.client.Close(); closeErr != nil {
-				// Best-effort close, ignore error
-				_ = closeErr
+			if err := errutil.SafeClose(pooledConn.client); err != nil {
+				lg.Debug("Failed to close connection %s: %v", key, err)
+				errs = append(errs, err)
 			}
 		}
 	}
 
 	p.connections = make(map[string]*PooledConnection)
+
+	if len(errs) > 0 {
+		lg.Warning("Closed connection pool with %d errors", len(errs))
+	} else {
+		lg.Debug("Successfully closed all connections in pool")
+	}
 }
 
 // Stats returns connection pool statistics

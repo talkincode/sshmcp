@@ -3,11 +3,12 @@ package app
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
 	"github.com/talkincode/sshmcp/internal/sshclient"
+	"github.com/talkincode/sshmcp/pkg/errutil"
+	"github.com/talkincode/sshmcp/pkg/logger"
 )
 
 // HandleHostManagement handles host management commands
@@ -115,7 +116,7 @@ func handleHostAdd(config *sshclient.Config) error {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 
-	log.Printf("✓ Host '%s' added successfully", host.Name)
+	logger.GetLogger().Success("Host '%s' added successfully", host.Name)
 	return nil
 }
 
@@ -202,7 +203,7 @@ func handleHostUpdate(config *sshclient.Config) error {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 
-	log.Printf("✓ Host '%s' updated successfully", host.Name)
+	logger.GetLogger().Success("Host '%s' updated successfully", host.Name)
 	return nil
 }
 
@@ -272,7 +273,7 @@ func handleHostTest(config *sshclient.Config) error {
 		return fmt.Errorf("host not found: %w", err)
 	}
 
-	log.Printf("Testing connection to '%s' (%s)...", hostConfig.Name, hostConfig.Host)
+	logger.GetLogger().Info("Testing connection to '%s' (%s)...", hostConfig.Name, hostConfig.Host)
 
 	// Create SSH config for testing
 	testConfig := &sshclient.Config{
@@ -290,7 +291,7 @@ func handleHostTest(config *sshclient.Config) error {
 	if hostConfig.PasswordKey != "" {
 		password, pwdErr := sshclient.GetSudoPassword(hostConfig.PasswordKey)
 		if pwdErr != nil {
-			log.Printf("Warning: failed to get password from keyring: %v", pwdErr)
+			logger.GetLogger().Warning("failed to get password from keyring: %v", pwdErr)
 		} else {
 			testConfig.Password = password
 		}
@@ -301,15 +302,11 @@ func handleHostTest(config *sshclient.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create SSH client: %w", err)
 	}
-	defer func() {
-		if closeErr := client.Close(); closeErr != nil {
-			log.Printf("Warning: failed to close client: %v", closeErr)
-		}
-	}()
+	defer errutil.HandleCloseError(&err, client)
 
 	// Test connection
 	if connectErr := client.Connect(); connectErr != nil {
-		log.Printf("✗ Connection failed: %v", connectErr)
+		logger.GetLogger().Error("Connection failed: %v", connectErr)
 		return fmt.Errorf("connection test failed")
 	}
 
@@ -319,11 +316,7 @@ func handleHostTest(config *sshclient.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create test client: %w", err)
 	}
-	defer func() {
-		if closeErr := client2.Close(); closeErr != nil {
-			log.Printf("Warning: failed to close client: %v", closeErr)
-		}
-	}()
+	defer errutil.HandleCloseError(&err, client2)
 
 	if connectErr := client2.Connect(); connectErr != nil {
 		return fmt.Errorf("failed to connect: %w", connectErr)
@@ -331,12 +324,12 @@ func handleHostTest(config *sshclient.Config) error {
 
 	output, err := client2.ExecuteCommandWithOutput()
 	if err != nil {
-		log.Printf("✗ Command execution failed: %v", err)
+		logger.GetLogger().Error("Command execution failed: %v", err)
 		return fmt.Errorf("command execution test failed")
 	}
 
-	log.Printf("✓ Connection successful!")
-	log.Printf("✓ Command execution successful!")
+	logger.GetLogger().Success("Connection successful!")
+	logger.GetLogger().Success("Command execution successful!")
 	fmt.Printf("\nTest output: %s\n", strings.TrimSpace(output))
 
 	return nil
@@ -364,6 +357,6 @@ func handleHostRemove(config *sshclient.Config) error {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 
-	log.Printf("✓ Host '%s' removed successfully", config.HostName)
+	logger.GetLogger().Success("Host '%s' removed successfully", config.HostName)
 	return nil
 }

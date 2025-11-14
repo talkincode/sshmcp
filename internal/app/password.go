@@ -2,13 +2,13 @@ package app
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
 	"github.com/zalando/go-keyring"
 
 	"github.com/talkincode/sshmcp/internal/sshclient"
+	"github.com/talkincode/sshmcp/pkg/logger"
 )
 
 // HandlePasswordManagement handles all password management operations.
@@ -46,9 +46,9 @@ func setPassword(serviceName, key, value string) error {
 		return fmt.Errorf("failed to set password: %w", err)
 	}
 
-	log.Printf("✓ Password saved to system keyring")
-	log.Printf("  Service: %s", serviceName)
-	log.Printf("  Key: %s", key)
+	logger.GetLogger().Success("Password saved to system keyring")
+	logger.GetLogger().Info("  Service: %s", serviceName)
+	logger.GetLogger().Info("  Key: %s", key)
 
 	fmt.Println("\nVerify with:")
 	if isWindows() {
@@ -75,9 +75,9 @@ func getPassword(serviceName, key string) error {
 		return fmt.Errorf("failed to get password: %w", err)
 	}
 
-	log.Printf("✓ Password retrieved from system keyring")
-	log.Printf("  Service: %s", serviceName)
-	log.Printf("  Key: %s", key)
+	logger.GetLogger().Success("Password retrieved from system keyring")
+	logger.GetLogger().Info("  Service: %s", serviceName)
+	logger.GetLogger().Info("  Key: %s", key)
 	fmt.Printf("\nPassword: %s\n", password)
 
 	return nil
@@ -91,7 +91,7 @@ func deletePassword(serviceName, key string) error {
 	_, err := keyring.Get(serviceName, key)
 	if err != nil {
 		if err == keyring.ErrNotFound {
-			log.Printf("Password not found for key: %s (already deleted or never existed)", key)
+			logger.GetLogger().Warning("Password not found for key: %s (already deleted or never existed)", key)
 			return nil
 		}
 		return fmt.Errorf("failed to check password: %w", err)
@@ -101,9 +101,9 @@ func deletePassword(serviceName, key string) error {
 		return fmt.Errorf("failed to delete password: %w", err)
 	}
 
-	log.Printf("✓ Password deleted from system keyring")
-	log.Printf("  Service: %s", serviceName)
-	log.Printf("  Key: %s", key)
+	logger.GetLogger().Success("Password deleted from system keyring")
+	logger.GetLogger().Info("  Service: %s", serviceName)
+	logger.GetLogger().Info("  Key: %s", key)
 
 	return nil
 }
@@ -115,14 +115,14 @@ func checkPassword(serviceName, key string) error {
 
 	_, err := keyring.Get(serviceName, key)
 	if err == nil {
-		log.Printf("✓ Password exists for key: %s", key)
+		logger.GetLogger().Success("Password exists for key: %s", key)
 		fmt.Printf("\nKey '%s' is stored in system keyring\n", key)
 		fmt.Printf("Service: %s\n", serviceName)
 		return nil
 	}
 
 	if err == keyring.ErrNotFound {
-		log.Printf("✗ Password not found for key: %s", key)
+		logger.GetLogger().Warning("Password not found for key: %s", key)
 		fmt.Printf("\nKey '%s' is NOT stored in system keyring\n", key)
 		fmt.Printf("Use 'sshx --password-set=%s' to add it\n", key)
 		return nil

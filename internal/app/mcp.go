@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/talkincode/sshmcp/internal/sshclient"
+	"github.com/talkincode/sshmcp/pkg/errutil"
 )
 
 // MCP Protocol types
@@ -606,7 +607,7 @@ func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interfa
 	if err != nil {
 		return "", fmt.Errorf("failed to create SSH client: %w", err)
 	}
-	defer sshclient.CloseIgnore(&err, client)
+	defer errutil.HandleCloseError(&err, client)
 
 	// 使用直接连接而不是连接池，避免连接复用导致的问题
 	if err = client.ConnectDirect(); err != nil {
@@ -649,7 +650,7 @@ func (s *MCPServer) executeSftpUpload(config *sshclient.Config, args map[string]
 	if err != nil {
 		return "", err
 	}
-	defer sshclient.CloseIgnore(&err, client)
+	defer errutil.HandleCloseError(&err, client)
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -687,7 +688,7 @@ func (s *MCPServer) executeSftpDownload(config *sshclient.Config, args map[strin
 	if err != nil {
 		return "", err
 	}
-	defer sshclient.CloseIgnore(&err, client)
+	defer errutil.HandleCloseError(&err, client)
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -720,7 +721,7 @@ func (s *MCPServer) executeSftpList(config *sshclient.Config, args map[string]in
 	if err != nil {
 		return "", err
 	}
-	defer sshclient.CloseIgnore(&err, client)
+	defer errutil.HandleCloseError(&err, client)
 
 	if err = client.Connect(); err != nil {
 		return "", err
@@ -781,7 +782,7 @@ func (s *MCPServer) executeSftpMkdir(config *sshclient.Config, args map[string]i
 	if err != nil {
 		return "", err
 	}
-	defer sshclient.CloseIgnore(&err, client)
+	defer errutil.HandleCloseError(&err, client)
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -814,7 +815,7 @@ func (s *MCPServer) executeSftpRemove(config *sshclient.Config, args map[string]
 	if err != nil {
 		return "", err
 	}
-	defer sshclient.CloseIgnore(&err, client)
+	defer errutil.HandleCloseError(&err, client)
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -880,7 +881,7 @@ func (s *MCPServer) executeScript(config *sshclient.Config, args map[string]inte
 	if err != nil {
 		return "", fmt.Errorf("failed to create SSH client: %w", err)
 	}
-	defer sshclient.CloseIgnore(&err, client)
+	defer errutil.HandleCloseError(&err, client)
 
 	if err = client.Connect(); err != nil {
 		return "", fmt.Errorf("failed to connect: %w", err)
