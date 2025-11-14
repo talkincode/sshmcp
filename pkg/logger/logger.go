@@ -134,12 +134,12 @@ func (l *Logger) EnableFileLogging(logPath string) error {
 
 	// 创建日志目录
 	logDir := filepath.Dir(logPath)
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return fmt.Errorf("failed to create log directory: %w", err)
 	}
 
 	// 打开日志文件
-	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600) //nolint:gosec // controlled log path
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
@@ -147,13 +147,13 @@ func (l *Logger) EnableFileLogging(logPath string) error {
 	// 获取当前文件大小
 	fileInfo, err := file.Stat()
 	if err != nil {
-		file.Close()
+		_ = file.Close() //nolint:errcheck // cleanup on error path
 		return fmt.Errorf("failed to stat log file: %w", err)
 	}
 
 	// 关闭旧的日志文件
 	if l.logFile != nil {
-		l.logFile.Close()
+		_ = l.logFile.Close() //nolint:errcheck // closing old file
 	}
 
 	l.logFile = file
@@ -204,11 +204,11 @@ func (l *Logger) rotateNoLock() error {
 
 		if i == l.maxFiles-1 {
 			// 删除最老的文件
-			_ = os.Remove(oldPath)
+			_ = os.Remove(oldPath) //nolint:errcheck // cleanup old files
 		} else {
 			// 重命名文件
 			if _, err := os.Stat(oldPath); err == nil {
-				_ = os.Rename(oldPath, newPath)
+				_ = os.Rename(oldPath, newPath) //nolint:errcheck // best effort file rotation
 			}
 		}
 	}
@@ -217,11 +217,11 @@ func (l *Logger) rotateNoLock() error {
 	firstBackup := fmt.Sprintf("%s.1", l.logPath)
 	if err := os.Rename(l.logPath, firstBackup); err != nil {
 		// 如果重命名失败，尝试直接创建新文件
-		_ = os.Remove(l.logPath)
+		_ = os.Remove(l.logPath) //nolint:errcheck // cleanup on rename failure
 	}
 
 	// 创建新的日志文件
-	file, err := os.OpenFile(l.logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	file, err := os.OpenFile(l.logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to create new log file: %w", err)
 	}
@@ -357,7 +357,7 @@ func (l *Logger) checkRotation() {
 
 	if fileInfo.Size() >= l.maxSize {
 		l.mu.Lock()
-		_ = l.rotateNoLock()
+		_ = l.rotateNoLock() //nolint:errcheck // rotation failure doesn't stop logging
 		l.mu.Unlock()
 	}
 }

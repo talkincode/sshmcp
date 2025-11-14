@@ -27,7 +27,7 @@ func TestFileLogging(t *testing.T) {
 	if err := logger.EnableFileLogging(logPath); err != nil {
 		t.Fatalf("Failed to enable file logging: %v", err)
 	}
-	defer logger.Close()
+	defer func() { _ = logger.Close() }() //nolint:errcheck // test cleanup
 
 	// 写入日志
 	logger.Info("Test log message")
@@ -50,7 +50,7 @@ func TestLogRotation(t *testing.T) {
 	if err := logger.EnableFileLogging(logPath); err != nil {
 		t.Fatalf("Failed to enable file logging: %v", err)
 	}
-	defer logger.Close()
+	defer func() { _ = logger.Close() }() //nolint:errcheck // test cleanup
 
 	// 写入足够多的日志以触发轮换
 	for i := 0; i < 50; i++ {

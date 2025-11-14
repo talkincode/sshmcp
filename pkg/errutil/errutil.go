@@ -80,9 +80,9 @@ func IsRetriableError(err error) bool {
 		return false
 	}
 
-	// 网络相关的临时错误通常可重试
+	// 网络相关的超时错误通常可重试
 	var netErr net.Error
-	if errors.As(err, &netErr) && netErr.Temporary() {
+	if errors.As(err, &netErr) && netErr.Timeout() {
 		return true
 	}
 

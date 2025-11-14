@@ -78,7 +78,7 @@ func (p *ConnectionPool) GetConnection(config *Config) (*ssh.Client, error) {
 		// Connection is invalid, remove and recreate
 		pooledConn.mu.Lock()
 		if pooledConn.client != nil {
-			_ = errutil.SafeClose(pooledConn.client)
+			_ = errutil.SafeClose(pooledConn.client) //nolint:errcheck
 		}
 		pooledConn.mu.Unlock()
 		delete(p.connections, key)
@@ -170,7 +170,7 @@ func (p *ConnectionPool) isConnectionAlive(client *ssh.Client) bool {
 		return false
 	}
 	defer func() {
-		_ = errutil.SafeClose(session)
+		_ = errutil.SafeClose(session) //nolint:errcheck
 	}()
 
 	// Execute a lightweight command to truly verify the connection is alive
