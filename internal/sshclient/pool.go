@@ -129,6 +129,25 @@ func (p *ConnectionPool) ReleaseConnection(config *Config) {
 	}
 }
 
+// RemoveConnection removes a connection from the pool (used when connection fails)
+func (p *ConnectionPool) RemoveConnection(config *Config) {
+	key := p.makeKey(config)
+	lg := logger.GetLogger()
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if pooledConn, exists := p.connections[key]; exists {
+		pooledConn.mu.Lock()
+		if pooledConn.client != nil {
+			_ = errutil.SafeClose(pooledConn.client) //nolint:errcheck
+		}
+		pooledConn.mu.Unlock()
+		delete(p.connections, key)
+		lg.Debug("🗑️  Removed failed connection from pool: %s", key)
+	}
+}
+
 // createConnectionWithRetry creates a connection with retry mechanism
 func (p *ConnectionPool) createConnectionWithRetry(config *Config) (*ssh.Client, error) {
 	var lastErr error
@@ -170,7 +189,7 @@ func (p *ConnectionPool) isConnectionAlive(client *ssh.Client) bool {
 		return false
 	}
 
-	// Try to create a session and execute a simple command to verify connection
+	// First, try to create a session - this is a lightweight check
 	session, err := client.NewSession()
 	if err != nil {
 		return false
@@ -179,10 +198,21 @@ func (p *ConnectionPool) isConnectionAlive(client *ssh.Client) bool {
 		_ = errutil.SafeClose(session) //nolint:errcheck
 	}()
 
-	// Execute a lightweight command to truly verify the connection is alive
-	// This catches EOF and other connection issues that NewSession alone might miss
-	err = session.Run("echo ping")
-	return err == nil
+	// Set a timeout for the health check to avoid hanging
+	done := make(chan error, 1)
+	go func() {
+		// Execute a lightweight command to truly verify the connection is alive
+		// This catches EOF and other connection issues that NewSession alone might miss
+		done <- session.Run("echo ping")
+	}()
+
+	select {
+	case err := <-done:
+		return err == nil
+	case <-time.After(5 * time.Second):
+		// Health check timeout - connection is likely dead
+		return false
+	}
 }
 
 // makeKey generates a connection pool key

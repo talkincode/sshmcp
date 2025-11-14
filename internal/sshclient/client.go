@@ -200,14 +200,23 @@ func (c *SSHClient) ConnectDirect() error {
 		Timeout:         DefaultTimeout,
 	}
 
-	addr := fmt.Sprintf("%s:%s", c.config.Host, c.config.Port)
+	addr := net.JoinHostPort(c.config.Host, c.config.Port)
 	lg.Debug("Connecting to %s@%s...", c.config.User, addr)
 
-	client, err := ssh.Dial("tcp", addr, sshConfig)
+	// Use net.DialTimeout for TCP connection with timeout control
+	conn, err := net.DialTimeout("tcp", addr, DefaultTimeout)
 	if err != nil {
-		return fmt.Errorf("failed to dial: %w", err)
+		return fmt.Errorf("failed to connect to %s: %w", addr, err)
 	}
 
+	// Create SSH client connection over the TCP connection
+	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, sshConfig)
+	if err != nil {
+		_ = conn.Close() //nolint:errcheck
+		return fmt.Errorf("failed to establish SSH connection: %w", err)
+	}
+
+	client := ssh.NewClient(sshConn, chans, reqs)
 	c.client = client
 	lg.Debug("Connected successfully")
 	return nil
@@ -566,6 +575,17 @@ func (c *SSHClient) Close() error {
 		pool.ReleaseConnection(c.config)
 	}
 	return nil
+}
+
+// CloseWithError closes the connection and removes it from pool if there's an error
+func (c *SSHClient) CloseWithError(err error) error {
+	if err != nil && c.config != nil {
+		// If there's an error, remove the connection from pool
+		pool := GetConnectionPool()
+		pool.RemoveConnection(c.config)
+		return err
+	}
+	return c.Close()
 }
 
 // ForceClose forcefully closes the connection (does not release back to pool)

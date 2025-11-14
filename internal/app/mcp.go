@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/talkincode/sshmcp/internal/sshclient"
-	"github.com/talkincode/sshmcp/pkg/errutil"
+	"github.com/talkincode/sshmcp/pkg/logger"
 )
 
 // MCP Protocol types
@@ -406,8 +406,23 @@ func (s *MCPServer) Start() error {
 			continue
 		}
 
+		// Debug log: print received request with formatted JSON
+		if logger.GetLogger().GetLevel() <= logger.LogLevelDebug {
+			var prettyJSON interface{}
+			if err := json.Unmarshal([]byte(line), &prettyJSON); err == nil {
+				if formatted, err := json.MarshalIndent(prettyJSON, "", "  "); err == nil {
+					logger.GetLogger().Debug("MCP Request received:\n%s", string(formatted))
+				} else {
+					logger.GetLogger().Debug("MCP Request received: %s", line)
+				}
+			} else {
+				logger.GetLogger().Debug("MCP Request received: %s", line)
+			}
+		}
+
 		var req MCPRequest
 		if err := json.Unmarshal([]byte(line), &req); err != nil {
+			logger.GetLogger().Debug("MCP Request parse error: %v", err)
 			s.sendError(nil, -32700, "Parse error", err.Error())
 			continue
 		}
@@ -418,6 +433,8 @@ func (s *MCPServer) Start() error {
 
 // handleRequest 处理MCP请求
 func (s *MCPServer) handleRequest(req *MCPRequest) {
+	logger.GetLogger().Debug("MCP handling request - Method: %s, ID: %v", req.Method, req.ID)
+
 	switch req.Method {
 	case "initialize":
 		s.handleInitialize(req)
@@ -426,9 +443,11 @@ func (s *MCPServer) handleRequest(req *MCPRequest) {
 	case "tools/call":
 		s.handleToolsCall(req)
 	case "shutdown":
+		logger.GetLogger().Debug("MCP shutdown requested")
 		s.sendResponse(req.ID, map[string]interface{}{})
 		os.Exit(0)
 	default:
+		logger.GetLogger().Debug("MCP unknown method: %s", req.Method)
 		s.sendError(req.ID, -32601, "Method not found", req.Method)
 	}
 }
@@ -464,20 +483,51 @@ func (s *MCPServer) handleToolsCall(req *MCPRequest) {
 	}
 
 	if err := json.Unmarshal(req.Params, &params); err != nil {
+		logger.GetLogger().Debug("MCP tools/call - Invalid params: %v", err)
 		s.sendError(req.ID, -32602, "Invalid params", err.Error())
 		return
+	}
+
+	// Debug log: print tool call details with formatted JSON
+	if argsJSON, err := json.MarshalIndent(params.Arguments, "", "  "); err == nil {
+		logger.GetLogger().Debug("MCP tools/call - Tool: %s\nArguments:\n%s", params.Name, string(argsJSON))
+	} else {
+		logger.GetLogger().Debug("MCP tools/call - Tool: %s, Arguments: %v", params.Name, params.Arguments)
 	}
 
 	result, err := s.executeTool(params.Name, params.Arguments)
 	if err != nil {
 		// 构建更详细的错误消息
 		errorMsg := fmt.Sprintf("Tool '%s' execution failed: %s", params.Name, err.Error())
+		logger.GetLogger().Debug("MCP tools/call - Execution failed: %v", err)
 		s.sendError(req.ID, -32000, errorMsg, map[string]interface{}{
 			"tool":      params.Name,
 			"arguments": params.Arguments,
 			"error":     err.Error(),
 		})
 		return
+	}
+
+	// Debug log: print execution result
+	if logger.GetLogger().GetLevel() <= logger.LogLevelDebug {
+		logger.GetLogger().Debug("MCP tools/call - Execution successful, result length: %d bytes", len(result))
+
+		// Try to format result if it contains JSON
+		var resultJSON interface{}
+		if err := json.Unmarshal([]byte(result), &resultJSON); err == nil {
+			if formatted, err := json.MarshalIndent(resultJSON, "", "  "); err == nil {
+				logger.GetLogger().Debug("MCP tools/call - Result (formatted JSON):\n%s", string(formatted))
+			} else {
+				logger.GetLogger().Debug("MCP tools/call - Result:\n%s", result)
+			}
+		} else {
+			// Not JSON, print as is (truncate if too long)
+			if len(result) > 1000 {
+				logger.GetLogger().Debug("MCP tools/call - Result (truncated):\n%s\n... (%d more bytes)", result[:1000], len(result)-1000)
+			} else {
+				logger.GetLogger().Debug("MCP tools/call - Result:\n%s", result)
+			}
+		}
 	}
 
 	s.sendResponse(req.ID, map[string]interface{}{
@@ -607,7 +657,10 @@ func (s *MCPServer) executeSSH(config *sshclient.Config, args map[string]interfa
 	if err != nil {
 		return "", fmt.Errorf("failed to create SSH client: %w", err)
 	}
-	defer errutil.HandleCloseError(&err, client)
+	// Use CloseWithError to remove failed connections from pool
+	defer func() {
+		_ = client.CloseWithError(err) //nolint:errcheck
+	}()
 
 	// 使用连接池来复用连接，提高性能
 	if err = client.Connect(); err != nil {
@@ -650,7 +703,9 @@ func (s *MCPServer) executeSftpUpload(config *sshclient.Config, args map[string]
 	if err != nil {
 		return "", err
 	}
-	defer errutil.HandleCloseError(&err, client)
+	defer func() {
+		_ = client.CloseWithError(err) //nolint:errcheck
+	}()
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -688,7 +743,9 @@ func (s *MCPServer) executeSftpDownload(config *sshclient.Config, args map[strin
 	if err != nil {
 		return "", err
 	}
-	defer errutil.HandleCloseError(&err, client)
+	defer func() {
+		_ = client.CloseWithError(err) //nolint:errcheck
+	}()
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -721,7 +778,9 @@ func (s *MCPServer) executeSftpList(config *sshclient.Config, args map[string]in
 	if err != nil {
 		return "", err
 	}
-	defer errutil.HandleCloseError(&err, client)
+	defer func() {
+		_ = client.CloseWithError(err) //nolint:errcheck
+	}()
 
 	if err = client.Connect(); err != nil {
 		return "", err
@@ -782,7 +841,9 @@ func (s *MCPServer) executeSftpMkdir(config *sshclient.Config, args map[string]i
 	if err != nil {
 		return "", err
 	}
-	defer errutil.HandleCloseError(&err, client)
+	defer func() {
+		_ = client.CloseWithError(err) //nolint:errcheck
+	}()
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -815,7 +876,9 @@ func (s *MCPServer) executeSftpRemove(config *sshclient.Config, args map[string]
 	if err != nil {
 		return "", err
 	}
-	defer errutil.HandleCloseError(&err, client)
+	defer func() {
+		_ = client.CloseWithError(err) //nolint:errcheck
+	}()
 
 	if err := client.Connect(); err != nil {
 		return "", err
@@ -835,6 +898,14 @@ func (s *MCPServer) sendResponse(id interface{}, result interface{}) {
 		ID:      id,
 		Result:  result,
 	}
+
+	// Debug log: print response with formatted JSON
+	if logger.GetLogger().GetLevel() <= logger.LogLevelDebug {
+		if respJSON, err := json.MarshalIndent(resp, "", "  "); err == nil {
+			logger.GetLogger().Debug("MCP Response sent:\n%s", string(respJSON))
+		}
+	}
+
 	s.writeJSON(resp)
 }
 
@@ -849,6 +920,14 @@ func (s *MCPServer) sendError(id interface{}, code int, message string, data int
 			Data:    data,
 		},
 	}
+
+	// Debug log: print error response with formatted JSON
+	if logger.GetLogger().GetLevel() <= logger.LogLevelDebug {
+		if respJSON, err := json.MarshalIndent(resp, "", "  "); err == nil {
+			logger.GetLogger().Debug("MCP Error response sent:\n%s", string(respJSON))
+		}
+	}
+
 	s.writeJSON(resp)
 }
 
@@ -881,7 +960,9 @@ func (s *MCPServer) executeScript(config *sshclient.Config, args map[string]inte
 	if err != nil {
 		return "", fmt.Errorf("failed to create SSH client: %w", err)
 	}
-	defer errutil.HandleCloseError(&err, client)
+	defer func() {
+		_ = client.CloseWithError(err) //nolint:errcheck
+	}()
 
 	if err = client.Connect(); err != nil {
 		return "", fmt.Errorf("failed to connect: %w", err)

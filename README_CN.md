@@ -374,6 +374,60 @@ export SUDO_PASSWORD=your_sudo_password
 ./bin/sshx "uptime"
 ```
 
+#### 日志级别配置
+
+通过 `SSHX_LOG_LEVEL` 环境变量可以控制日志输出级别：
+
+```bash
+# 设置日志级别为 DEBUG（显示详细的调试信息，包括 MCP 请求和响应）
+export SSHX_LOG_LEVEL=debug
+
+# 设置日志级别为 INFO（默认）
+export SSHX_LOG_LEVEL=info
+
+# 设置日志级别为 WARNING
+export SSHX_LOG_LEVEL=warning
+
+# 设置日志级别为 ERROR
+export SSHX_LOG_LEVEL=error
+```
+
+**MCP 模式下的调试日志：**
+
+在 MCP stdio 模式下，为了不干扰 JSON-RPC 通信，日志会输出到文件而不是标准输出。有两种方式启用 DEBUG 级别：
+
+**方式 1：使用 --debug 参数（推荐）**
+
+```bash
+# 使用 --debug 参数启动 MCP 服务器
+sshx mcp-stdio --debug
+
+# 日志文件位置: ~/.sshmcp/sshx.log
+# 可以实时查看日志
+tail -f ~/.sshmcp/sshx.log
+```
+
+**方式 2：使用环境变量**
+
+```bash
+# 设置环境变量启用 debug 日志
+export SSHX_LOG_LEVEL=debug
+sshx mcp-stdio
+
+# 日志文件位置: ~/.sshmcp/sshx.log
+# 可以实时查看日志
+tail -f ~/.sshmcp/sshx.log
+```
+
+**注意：** `--debug` 参数优先级高于环境变量。
+
+DEBUG 级别下会记录：
+
+- MCP 接收到的所有请求（JSON 格式）
+- MCP 发送的所有响应（JSON 格式）
+- 工具调用的详细参数和结果
+- SSH/SFTP 操作的详细过程
+
 ### 示例工作流
 
 ```bash

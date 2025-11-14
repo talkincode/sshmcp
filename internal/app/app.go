@@ -23,7 +23,44 @@ var ErrUsage = errors.New("usage displayed")
 func Run(args []string) (err error) {
 	// Handle MCP stdio mode
 	if len(args) >= 2 && (args[1] == "mcp-stdio" || args[1] == "--mcp-stdio") {
+		// Standard log output should be disabled to avoid interfering with JSON-RPC
 		log.SetOutput(io.Discard)
+
+		// Check for --debug flag in MCP mode
+		debugMode := false
+		// #nosec G602 - slice bounds are properly checked before access
+		for i := 2; i < len(args); i++ {
+			if args[i] == "--debug" {
+				debugMode = true
+				break
+			}
+		}
+
+		// But we can use file logging for debug purposes
+		// Check --debug flag first, then environment variable
+		if debugMode {
+			logger.GetLogger().SetLevel(logger.LogLevelDebug)
+			if fileErr := logger.GetLogger().EnableFileLogging(""); fileErr != nil {
+				// Silently ignore file logging errors in MCP mode
+				_ = fileErr
+			} else {
+				logger.GetLogger().Debug("MCP server starting in debug mode (--debug flag), logs will be written to file")
+			}
+		} else if logLevelStr := os.Getenv("SSHX_LOG_LEVEL"); logLevelStr != "" {
+			// Fallback to environment variable for MCP mode
+			logLevel := logger.LogLevelFromString(logLevelStr)
+			logger.GetLogger().SetLevel(logLevel)
+
+			// Enable file logging in debug mode
+			if logLevel == logger.LogLevelDebug {
+				if fileErr := logger.GetLogger().EnableFileLogging(""); fileErr != nil {
+					// Silently ignore file logging errors in MCP mode
+					_ = fileErr
+				} else {
+					logger.GetLogger().Debug("MCP server starting in debug mode (SSHX_LOG_LEVEL), logs will be written to file")
+				}
+			}
+		}
 
 		server := NewMCPServer()
 		if startErr := server.Start(); startErr != nil {

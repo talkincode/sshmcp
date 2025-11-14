@@ -439,6 +439,60 @@ export SUDO_PASSWORD=your_sudo_password
 ./bin/sshx "uptime"
 ```
 
+#### Log Level Configuration
+
+You can control the logging verbosity using the `SSHX_LOG_LEVEL` environment variable:
+
+```bash
+# Set log level to DEBUG (shows detailed debugging information, including MCP requests/responses)
+export SSHX_LOG_LEVEL=debug
+
+# Set log level to INFO (default)
+export SSHX_LOG_LEVEL=info
+
+# Set log level to WARNING
+export SSHX_LOG_LEVEL=warning
+
+# Set log level to ERROR
+export SSHX_LOG_LEVEL=error
+```
+
+**Debug Logging in MCP Mode:**
+
+In MCP stdio mode, to avoid interfering with JSON-RPC communication, logs are written to a file instead of stdout. There are two ways to enable DEBUG level:
+
+**Method 1: Using --debug flag (Recommended)**
+
+```bash
+# Start MCP server with --debug flag
+sshx mcp-stdio --debug
+
+# Log file location: ~/.sshmcp/sshx.log
+# You can monitor logs in real-time
+tail -f ~/.sshmcp/sshx.log
+```
+
+**Method 2: Using environment variable**
+
+```bash
+# Set environment variable to enable debug logging
+export SSHX_LOG_LEVEL=debug
+sshx mcp-stdio
+
+# Log file location: ~/.sshmcp/sshx.log
+# You can monitor logs in real-time
+tail -f ~/.sshmcp/sshx.log
+```
+
+**Note:** The `--debug` flag takes precedence over the environment variable.
+
+Debug level logs include:
+
+- All MCP requests received (JSON format)
+- All MCP responses sent (JSON format)
+- Detailed parameters and results of tool calls
+- Detailed SSH/SFTP operation processes
+
 ### Example Workflow
 
 ```bash
