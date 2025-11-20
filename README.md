@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD033 MD036 MD040 MD041 -->
+
 ```
  $$$$$$\   $$$$$$\  $$\   $$\ $$\      $$\  $$$$$$\  $$$$$$$\
 $$  __$$\ $$  __$$\ $$ |  $$ |$$$\    $$$ |$$  __$$\ $$  __$$\
@@ -220,6 +222,9 @@ sshx --host-test=prod-web
 
 # Use configured host (auto-resolves from settings)
 sshx -h=prod-web "systemctl status nginx"
+
+# Test every configured host and show auth methods
+sshx --host-test-all
 ```
 
 ### Configuration File Format
@@ -249,6 +254,7 @@ Location: `~/.sshmcp/settings.json`
 - `--host-import` - Import hosts from `~/.ssh/config`
 - `--host-list` - List all configured hosts
 - `--host-test=<name>` - Test connection to a host
+- `--host-test-all` - Test connections to all hosts (per-host 10s dial timeout) and show auth method used
 - `--host-remove=<name>` - Remove a host from configuration
 
 **Benefits:**
@@ -400,7 +406,7 @@ ssh-prod-db "sudo systemctl restart mysql"
 ssh-dev "sudo docker-compose up -d"
 ```
 
-### Environment Variables
+### Sudo Key Environment Variables
 
 You can customize the sudo password key name via environment variable (but using `-pk` parameter is more flexible):
 
@@ -424,7 +430,7 @@ sshx -h=192.168.1.101 -pk=server-B "sudo ls -la /root"
 - ⚠️ Requires OS credential manager to be available
 - ⚠️ On Linux, requires Secret Service daemon running (usually automatic with desktop environments)
 
-### Environment Variables
+### Connection Environment Variables
 
 You can use environment variables to avoid typing credentials repeatedly:
 
@@ -438,6 +444,13 @@ export SUDO_PASSWORD=your_sudo_password
 # Then run commands without flags
 ./bin/sshx "uptime"
 ```
+
+### SSH Authentication Preferences
+
+- `sshx` now prioritizes SSH keys and automatically falls back to password authentication when the server rejects your key (for example when a host only allows passwords). As long as a password is available, the client will transparently retry with a password-only session.
+- Use `--no-key` (alias `--password-only`) to disable key authentication for a single command. You can re-enable it by supplying `--key=<path>` again.
+- Set `SSH_DISABLE_KEY=true` in your environment to permanently disable key authentication (useful on hosts that never accept keys). This override is respected even if a default key path exists in `~/.sshmcp/settings.json`.
+- When key auth is enabled and no explicit path is provided, `sshx` still auto-loads `~/.ssh/id_rsa` (or the path specified in settings) before falling back to passwords.
 
 #### Log Level Configuration
 

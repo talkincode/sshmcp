@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "go",
+      "label": "go: test package",
+      "command": "test",
+      "args": ["${workspaceFolder}/..."],
+      "problemMatcher": ["$go"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "detail": "cd /Volumes/ExtDISK/github/sshx; go test ./..."
+    }
+  ]
+}

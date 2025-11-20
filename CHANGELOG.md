@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add hosts interactively with `--host-add`
   - List configured hosts with `--host-list`
   - Test host connections with `--host-test=<name>`
+  - Test all hosts with `--host-test-all`, get per-host authentication reports, and benefit from a fast 10s dial timeout so unreachable hosts no longer block the run
   - Remove hosts with `--host-remove=<name>`
   - Auto-resolve host details when using `-h=<hostname>`
   - Support for default SSH key path in settings
@@ -23,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `host_list` - List all configured hosts
   - `host_test` - Test host connections
   - `host_remove` - Remove host configurations
+- **Flexible authentication controls**
+  - `--no-key`/`--password-only` flag and `SSH_DISABLE_KEY` environment variable to force password-only sessions
+  - Automatic password fallback when public key authentication fails on hosts that reject keys
 
 ### Changed
 

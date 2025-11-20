@@ -10,5 +10,15 @@
   "[yaml]": {
     "editor.defaultFormatter": "redhat.vscode-yaml"
   },
-  "yaml.customTags": ["!include"]
+  "yaml.customTags": ["!include"],
+  "terminal.integrated.profiles.osx": {
+    "zsh-with-english": {
+      "path": "/bin/zsh",
+      "args": [
+        "-c",
+        "/usr/local/bin/im-select com.apple.keylayout.ABC; exec zsh"
+      ]
+    }
+  },
+  "terminal.integrated.defaultProfile.osx": "zsh-with-english"
 }

@@ -2,6 +2,7 @@ package sshclient
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -26,16 +27,28 @@ const (
 	PasswordPromptEnd = ": "
 )
 
+// AuthMethod indicates which authentication mechanism was used for the SSH connection.
+type AuthMethod string
+
+const (
+	AuthMethodUnknown          AuthMethod = "unknown"
+	AuthMethodKey              AuthMethod = "key"
+	AuthMethodPassword         AuthMethod = "password"
+	AuthMethodPasswordFallback AuthMethod = "password-fallback"
+)
+
 // Config represents SSH configuration properties for connecting to remote hosts.
 type Config struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	KeyPath  string
-	SudoKey  string
-	Command  string
-	Mode     string
+	Host        string
+	Port        string
+	User        string
+	Password    string
+	KeyPath     string
+	UseKeyAuth  bool
+	SudoKey     string
+	Command     string
+	Mode        string
+	DialTimeout time.Duration
 
 	SafetyCheck bool
 	Force       bool
@@ -57,9 +70,21 @@ type Config struct {
 
 // SSHClient wraps an ssh.Client with optional pooled and sftp helpers.
 type SSHClient struct {
-	config     *Config
-	client     *ssh.Client
-	sftpClient *sftp.Client
+	config         *Config
+	client         *ssh.Client
+	sftpClient     *sftp.Client
+	authMethodUsed AuthMethod
+}
+
+// AuthMethodUsed returns the authentication method used for the current connection.
+func (c *SSHClient) AuthMethodUsed() AuthMethod {
+	if c == nil {
+		return AuthMethodUnknown
+	}
+	if c.authMethodUsed == "" {
+		return AuthMethodUnknown
+	}
+	return c.authMethodUsed
 }
 
 // getHostKeyCallback returns a secure host key callback function
@@ -133,20 +158,25 @@ func NewSSHClient(config *Config) (*SSHClient, error) {
 	if config.User == "" {
 		config.User = DefaultSSHUser
 	}
-	if config.KeyPath == "" {
+	// Default to key authentication unless explicitly disabled
+	if !config.UseKeyAuth {
+		config.KeyPath = ""
+	}
+	if config.UseKeyAuth && config.KeyPath == "" {
 		home, err := os.UserHomeDir()
 		if err == nil {
 			config.KeyPath = filepath.Join(home, ".ssh", "id_rsa")
 		}
 	}
 
-	return &SSHClient{config: config}, nil
+	return &SSHClient{config: config, authMethodUsed: AuthMethodUnknown}, nil
 }
 
 // Connect establishes an SSH connection (prefers using connection pool)
 func (c *SSHClient) Connect() error {
 	lg := logger.GetLogger()
 	pool := GetConnectionPool()
+	c.authMethodUsed = AuthMethodUnknown
 	client, err := pool.GetConnection(c.config)
 	if err == nil {
 		c.client = client
@@ -160,10 +190,15 @@ func (c *SSHClient) Connect() error {
 // ConnectDirect establishes a direct SSH connection (without using connection pool)
 func (c *SSHClient) ConnectDirect() error {
 	lg := logger.GetLogger()
-	var authMethods []ssh.AuthMethod
+	timeout := c.config.DialTimeout
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+	var keyAuthMethods []ssh.AuthMethod
+	var passwordAuth ssh.AuthMethod
+	c.authMethodUsed = AuthMethodUnknown
 
-	if c.config.KeyPath != "" {
-		// Expand ~ in path to user home directory
+	if c.config.UseKeyAuth && c.config.KeyPath != "" {
 		keyPath := c.config.KeyPath
 		if strings.HasPrefix(keyPath, "~/") {
 			if home, err := os.UserHomeDir(); err == nil {
@@ -174,7 +209,7 @@ func (c *SSHClient) ConnectDirect() error {
 		if key, err := os.ReadFile(keyPath); err == nil { //nolint:gosec // G304: key path is provided by user
 			signer, signerErr := ssh.ParsePrivateKey(key)
 			if signerErr == nil {
-				authMethods = append(authMethods, ssh.PublicKeys(signer))
+				keyAuthMethods = append(keyAuthMethods, ssh.PublicKeys(signer))
 				lg.Debug("Using SSH key: %s", keyPath)
 			} else {
 				lg.Warning("failed to parse SSH key: %v", signerErr)
@@ -185,41 +220,80 @@ func (c *SSHClient) ConnectDirect() error {
 	}
 
 	if c.config.Password != "" {
-		authMethods = append(authMethods, ssh.Password(c.config.Password))
+		passwordAuth = ssh.Password(c.config.Password)
 		lg.Debug("Using password authentication")
 	}
 
-	if len(authMethods) == 0 {
+	if len(keyAuthMethods) == 0 && passwordAuth == nil {
 		return fmt.Errorf("no authentication method available")
 	}
 
-	sshConfig := &ssh.ClientConfig{
-		User:            c.config.User,
-		Auth:            authMethods,
-		HostKeyCallback: getHostKeyCallback(),
-		Timeout:         DefaultTimeout,
+	dialWithAuth := func(methods []ssh.AuthMethod) (*ssh.Client, error) {
+		sshConfig := &ssh.ClientConfig{
+			User:            c.config.User,
+			Auth:            methods,
+			HostKeyCallback: getHostKeyCallback(),
+			Timeout:         timeout,
+		}
+
+		addr := net.JoinHostPort(c.config.Host, c.config.Port)
+		lg.Debug("Connecting to %s@%s...", c.config.User, addr)
+
+		conn, err := net.DialTimeout("tcp", addr, timeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to %s: %w", addr, err)
+		}
+
+		sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, sshConfig)
+		if err != nil {
+			_ = conn.Close() //nolint:errcheck
+			return nil, err
+		}
+
+		return ssh.NewClient(sshConn, chans, reqs), nil
 	}
 
-	addr := net.JoinHostPort(c.config.Host, c.config.Port)
-	lg.Debug("Connecting to %s@%s...", c.config.User, addr)
+	if len(keyAuthMethods) > 0 {
+		client, err := dialWithAuth(keyAuthMethods)
+		if err == nil {
+			c.client = client
+			c.authMethodUsed = AuthMethodKey
+			lg.Debug("Connected successfully")
+			return nil
+		}
 
-	// Use net.DialTimeout for TCP connection with timeout control
-	conn, err := net.DialTimeout("tcp", addr, DefaultTimeout)
-	if err != nil {
-		return fmt.Errorf("failed to connect to %s: %w", addr, err)
-	}
+		if shouldFallbackToPassword(err, true, passwordAuth != nil) {
+			lg.Warning("Public key authentication failed (%v), retrying with password only", err)
+			passwordClient, passErr := dialWithAuth([]ssh.AuthMethod{passwordAuth})
+			if passErr == nil {
+				c.client = passwordClient
+				c.authMethodUsed = AuthMethodPasswordFallback
+				lg.Debug("Connected successfully with password fallback")
+				return nil
+			}
+			return fmt.Errorf("failed to establish SSH connection after password fallback: %w", passErr)
+		}
 
-	// Create SSH client connection over the TCP connection
-	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, sshConfig)
-	if err != nil {
-		_ = conn.Close() //nolint:errcheck
 		return fmt.Errorf("failed to establish SSH connection: %w", err)
 	}
 
-	client := ssh.NewClient(sshConn, chans, reqs)
-	c.client = client
-	lg.Debug("Connected successfully")
-	return nil
+	passwordClient, passErr := dialWithAuth([]ssh.AuthMethod{passwordAuth})
+	if passErr == nil {
+		c.client = passwordClient
+		c.authMethodUsed = AuthMethodPassword
+		lg.Debug("Connected successfully with password")
+		return nil
+	}
+
+	return fmt.Errorf("failed to establish SSH connection: %w", passErr)
+}
+
+func shouldFallbackToPassword(err error, hadKeyAuth bool, hasPassword bool) bool {
+	if !hadKeyAuth || !hasPassword || err == nil {
+		return false
+	}
+	var serverErr *ssh.ServerAuthError
+	return errors.As(err, &serverErr)
 }
 
 // ExecuteCommand executes a command
@@ -580,7 +654,6 @@ func (c *SSHClient) Close() error {
 // CloseWithError closes the connection and removes it from pool if there's an error
 func (c *SSHClient) CloseWithError(err error) error {
 	if err != nil && c.config != nil {
-		// If there's an error, remove the connection from pool
 		pool := GetConnectionPool()
 		pool.RemoveConnection(c.config)
 		return err

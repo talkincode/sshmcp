@@ -83,7 +83,8 @@ func TestExecuteHostTest_EmptyNameParameter(t *testing.T) {
 func TestExecuteSSH_TestMode(t *testing.T) {
 	server := NewMCPServer()
 	config := &sshclient.Config{
-		Host: "0.0.0.0", // Test mode indicator
+		Host:       "0.0.0.0", // Test mode indicator
+		UseKeyAuth: true,
 	}
 	args := map[string]interface{}{}
 
@@ -97,7 +98,8 @@ func TestExecuteSSH_TestMode(t *testing.T) {
 func TestExecuteSSH_MissingCommand(t *testing.T) {
 	server := NewMCPServer()
 	config := &sshclient.Config{
-		Host: "192.168.1.100",
+		Host:       "192.168.1.100",
+		UseKeyAuth: true,
 	}
 	args := map[string]interface{}{
 		// No command provided

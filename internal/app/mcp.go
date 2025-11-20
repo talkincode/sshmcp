@@ -543,7 +543,7 @@ func (s *MCPServer) handleToolsCall(req *MCPRequest) {
 // executeTool 执行工具
 func (s *MCPServer) executeTool(name string, args map[string]interface{}) (string, error) {
 	// 构建配置
-	config := &sshclient.Config{}
+	config := &sshclient.Config{UseKeyAuth: true}
 
 	// 加载 settings 获取默认配置
 	settings, settingsErr := LoadSettings()
@@ -571,6 +571,20 @@ func (s *MCPServer) executeTool(name string, args map[string]interface{}) (strin
 	} else if settingsErr == nil && settings.Key != "" {
 		// 使用 settings 中的默认密钥
 		config.KeyPath = settings.Key
+	}
+	if useKeyAuth, ok := args["use_key_auth"].(bool); ok {
+		config.UseKeyAuth = useKeyAuth
+		if !useKeyAuth {
+			config.KeyPath = ""
+		}
+	} else if useKeyAuthStr, ok := args["use_key_auth"].(string); ok {
+		config.UseKeyAuth = strings.EqualFold(useKeyAuthStr, "true") || useKeyAuthStr == "1"
+		if !config.UseKeyAuth {
+			config.KeyPath = ""
+		}
+	}
+	if !config.UseKeyAuth {
+		config.KeyPath = ""
 	}
 
 	switch name {
@@ -1131,10 +1145,11 @@ func (s *MCPServer) executeHostTest(args map[string]interface{}) (string, error)
 
 	// Create SSH config for testing with command
 	testConfig := &sshclient.Config{
-		Host:    hostConfig.Host,
-		Port:    hostConfig.Port,
-		User:    hostConfig.User,
-		Command: "echo 'Connection test successful'",
+		Host:       hostConfig.Host,
+		Port:       hostConfig.Port,
+		User:       hostConfig.User,
+		Command:    "echo 'Connection test successful'",
+		UseKeyAuth: true,
 	}
 
 	// Get default SSH key if not specified

@@ -1,11 +1,13 @@
 package sshclient
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/ssh"
 )
 
 func TestNewSSHClient(t *testing.T) {
@@ -18,10 +20,11 @@ func TestNewSSHClient(t *testing.T) {
 		{
 			name: "Complete configuration",
 			config: &Config{
-				Host:    "192.168.1.100",
-				Port:    "2222",
-				User:    "admin",
-				KeyPath: "/path/to/key",
+				Host:       "192.168.1.100",
+				Port:       "2222",
+				User:       "admin",
+				KeyPath:    "/path/to/key",
+				UseKeyAuth: true,
 			},
 			expectError: false,
 			checkFunc: func(t *testing.T, client *SSHClient, config *Config) {
@@ -34,7 +37,8 @@ func TestNewSSHClient(t *testing.T) {
 		{
 			name: "Using default values",
 			config: &Config{
-				Host: "example.com",
+				Host:       "example.com",
+				UseKeyAuth: true,
 			},
 			expectError: false,
 			checkFunc: func(t *testing.T, client *SSHClient, config *Config) {
@@ -51,17 +55,20 @@ func TestNewSSHClient(t *testing.T) {
 			},
 		},
 		{
-			name:        "Missing Host",
-			config:      &Config{},
+			name: "Missing Host",
+			config: &Config{
+				UseKeyAuth: true,
+			},
 			expectError: true,
 			checkFunc:   nil,
 		},
 		{
 			name: "Custom port and user",
 			config: &Config{
-				Host: "test.server.com",
-				Port: "8022",
-				User: "testuser",
+				Host:       "test.server.com",
+				Port:       "8022",
+				User:       "testuser",
+				UseKeyAuth: true,
 			},
 			expectError: false,
 			checkFunc: func(t *testing.T, client *SSHClient, config *Config) {
@@ -92,7 +99,8 @@ func TestNewSSHClient(t *testing.T) {
 
 func TestNewSSHClient_DefaultKeyPath(t *testing.T) {
 	config := &Config{
-		Host: "test.com",
+		Host:       "test.com",
+		UseKeyAuth: true,
 	}
 
 	client, err := NewSSHClient(config)
@@ -108,9 +116,24 @@ func TestNewSSHClient_DefaultKeyPath(t *testing.T) {
 	}
 }
 
+func TestNewSSHClient_KeyAuthDisabled(t *testing.T) {
+	config := &Config{
+		Host:       "nokey.test",
+		Password:   "secret",
+		UseKeyAuth: false,
+	}
+
+	client, err := NewSSHClient(config)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
+	assert.Equal(t, "", client.config.KeyPath)
+}
+
 func TestConfig_Defaults(t *testing.T) {
 	config := &Config{
-		Host: "testhost",
+		Host:       "testhost",
+		UseKeyAuth: true,
 	}
 
 	client, err := NewSSHClient(config)
@@ -133,6 +156,7 @@ func TestConfig_CustomValues(t *testing.T) {
 		Mode:        "ssh",
 		SafetyCheck: true,
 		Force:       false,
+		UseKeyAuth:  true,
 	}
 
 	client, err := NewSSHClient(config)
@@ -154,7 +178,8 @@ func TestConfig_CustomValues(t *testing.T) {
 
 func TestSSHClient_NilConfig(t *testing.T) {
 	config := &Config{
-		Host: "",
+		Host:       "",
+		UseKeyAuth: true,
 	}
 
 	client, err := NewSSHClient(config)
@@ -172,6 +197,7 @@ func TestConfig_SFTPFields(t *testing.T) {
 		SftpAction: "upload",
 		LocalPath:  "/local/file.txt",
 		RemotePath: "/remote/file.txt",
+		UseKeyAuth: true,
 	}
 
 	client, err := NewSSHClient(config)
@@ -189,6 +215,7 @@ func TestConfig_PasswordFields(t *testing.T) {
 		PasswordAction: "set",
 		PasswordKey:    "mykey",
 		PasswordValue:  "myvalue",
+		UseKeyAuth:     true,
 	}
 
 	client, err := NewSSHClient(config)
@@ -210,7 +237,8 @@ func TestConstants(t *testing.T) {
 
 func TestSSHClient_InitialState(t *testing.T) {
 	config := &Config{
-		Host: "test.com",
+		Host:       "test.com",
+		UseKeyAuth: true,
 	}
 
 	client, err := NewSSHClient(config)
@@ -227,11 +255,31 @@ func TestConfig_MultipleHosts(t *testing.T) {
 	hosts := []string{"host1.com", "host2.com", "192.168.1.1"}
 
 	for _, host := range hosts {
-		config := &Config{Host: host}
+		config := &Config{Host: host, UseKeyAuth: true}
 		client, err := NewSSHClient(config)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, client)
 		assert.Equal(t, host, client.config.Host)
 	}
+}
+
+func TestShouldFallbackToPassword(t *testing.T) {
+	authErr := &ssh.ServerAuthError{Errors: []error{fmt.Errorf("publickey denied")}}
+
+	t.Run("requires key auth present", func(t *testing.T) {
+		assert.False(t, shouldFallbackToPassword(authErr, false, true))
+	})
+
+	t.Run("requires password available", func(t *testing.T) {
+		assert.False(t, shouldFallbackToPassword(authErr, true, false))
+	})
+
+	t.Run("auth error triggers fallback", func(t *testing.T) {
+		assert.True(t, shouldFallbackToPassword(authErr, true, true))
+	})
+
+	t.Run("nil error", func(t *testing.T) {
+		assert.False(t, shouldFallbackToPassword(nil, true, true))
+	})
 }

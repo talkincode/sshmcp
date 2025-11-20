@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/talkincode/sshmcp/internal/sshclient"
-	"github.com/talkincode/sshmcp/pkg/errutil"
 	"github.com/talkincode/sshmcp/pkg/logger"
 )
+
+const hostTestDialTimeout = 10 * time.Second
 
 // HandleHostManagement handles host management commands
 func HandleHostManagement(config *sshclient.Config) error {
@@ -22,6 +24,8 @@ func HandleHostManagement(config *sshclient.Config) error {
 		return handleHostList(config)
 	case "test":
 		return handleHostTest(config)
+	case "test-all":
+		return handleHostTestAll(config)
 	case "remove":
 		return handleHostRemove(config)
 	default:
@@ -275,62 +279,25 @@ func handleHostTest(config *sshclient.Config) error {
 
 	logger.GetLogger().Info("Testing connection to '%s' (%s)...", hostConfig.Name, hostConfig.Host)
 
-	// Create SSH config for testing
-	testConfig := &sshclient.Config{
-		Host: hostConfig.Host,
-		Port: hostConfig.Port,
-		User: hostConfig.User,
-	}
-
-	// Get default SSH key if not specified
-	if settings.Key != "" {
-		testConfig.KeyPath = settings.Key
-	}
-
-	// Try to get password if password key is configured
-	if hostConfig.PasswordKey != "" {
-		password, pwdErr := sshclient.GetSudoPassword(hostConfig.PasswordKey)
-		if pwdErr != nil {
-			logger.GetLogger().Warning("failed to get password from keyring: %v", pwdErr)
-		} else {
-			testConfig.Password = password
+	result := runHostDiagnostics(hostConfig, settings, config)
+	if !result.ConnectionSuccess {
+		if result.ConnectionError != nil {
+			logger.GetLogger().Error("Connection failed: %v", result.ConnectionError)
 		}
-	}
-
-	// Create SSH client
-	client, err := sshclient.NewSSHClient(testConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create SSH client: %w", err)
-	}
-	defer errutil.HandleCloseError(&err, client)
-
-	// Test connection
-	if connectErr := client.Connect(); connectErr != nil {
-		logger.GetLogger().Error("Connection failed: %v", connectErr)
 		return fmt.Errorf("connection test failed")
 	}
 
-	// Test command execution
-	testConfig.Command = "echo 'Connection test successful'"
-	client2, err := sshclient.NewSSHClient(testConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create test client: %w", err)
-	}
-	defer errutil.HandleCloseError(&err, client2)
+	logger.GetLogger().Success("Connection successful! (%s)", formatAuthDescription(result.AuthMethod))
 
-	if connectErr := client2.Connect(); connectErr != nil {
-		return fmt.Errorf("failed to connect: %w", connectErr)
-	}
-
-	output, err := client2.ExecuteCommandWithOutput()
-	if err != nil {
-		logger.GetLogger().Error("Command execution failed: %v", err)
+	if !result.CommandSuccess {
+		if result.CommandError != nil {
+			logger.GetLogger().Error("Command execution failed: %v", result.CommandError)
+		}
 		return fmt.Errorf("command execution test failed")
 	}
 
-	logger.GetLogger().Success("Connection successful!")
 	logger.GetLogger().Success("Command execution successful!")
-	fmt.Printf("\nTest output: %s\n", strings.TrimSpace(output))
+	fmt.Printf("\nTest output: %s\n", strings.TrimSpace(result.CommandOutput))
 
 	return nil
 }
@@ -359,4 +326,175 @@ func handleHostRemove(config *sshclient.Config) error {
 
 	logger.GetLogger().Success("Host '%s' removed successfully", config.HostName)
 	return nil
+}
+
+// handleHostTestAll tests all configured hosts and prints a summary report.
+func handleHostTestAll(config *sshclient.Config) error {
+	settings, err := LoadSettings()
+	if err != nil {
+		return fmt.Errorf("failed to load settings: %w", err)
+	}
+
+	hosts := ListHosts(settings)
+	if len(hosts) == 0 {
+		fmt.Println("No hosts configured. Use sshx --host-add to add hosts before running --host-test-all.")
+		return nil
+	}
+
+	logger.GetLogger().Info("Testing %d host(s)...", len(hosts))
+	results := make([]hostTestResult, 0, len(hosts))
+	for _, host := range hosts {
+		hostCopy := host
+		logger.GetLogger().Info("→ %s (%s)", hostCopy.Name, hostCopy.Host)
+		result := runHostDiagnostics(&hostCopy, settings, config)
+		results = append(results, result)
+	}
+
+	successCount := 0
+	fmt.Printf("\n=== Host Test Report (%d hosts) ===\n\n", len(results))
+	for i, result := range results {
+		statusIcon := "❌"
+		statusMessage := "Connection failed"
+		switch {
+		case result.ConnectionSuccess && result.CommandSuccess:
+			statusIcon = "✅"
+			statusMessage = "Connection & command succeeded"
+		case result.ConnectionSuccess && !result.CommandSuccess:
+			statusIcon = "⚠️"
+			statusMessage = "Command execution failed"
+		}
+
+		if result.ConnectionSuccess && result.CommandSuccess {
+			successCount++
+		}
+
+		fmt.Printf("[%d] %s (%s)\n", i+1, result.Host.Name, result.Host.Host)
+		fmt.Printf("    Status: %s %s\n", statusIcon, statusMessage)
+		fmt.Printf("    Auth: %s\n", formatAuthDescription(result.AuthMethod))
+		if !result.ConnectionSuccess && result.ConnectionError != nil {
+			fmt.Printf("    Error: %v\n", result.ConnectionError)
+		} else if result.CommandSuccess {
+			output := strings.TrimSpace(result.CommandOutput)
+			if output != "" {
+				fmt.Printf("    Output: %s\n", output)
+			}
+		} else if result.CommandError != nil {
+			fmt.Printf("    Command Error: %v\n", result.CommandError)
+		}
+		fmt.Println()
+	}
+
+	fmt.Printf("Summary: %d/%d hosts succeeded\n", successCount, len(results))
+	if successCount != len(results) {
+		return fmt.Errorf("host test failed for %d host(s)", len(results)-successCount)
+	}
+
+	return nil
+}
+
+func runHostDiagnostics(hostConfig *HostConfig, settings *Settings, baseConfig *sshclient.Config) hostTestResult {
+	result := hostTestResult{
+		Host:       *hostConfig,
+		AuthMethod: sshclient.AuthMethodUnknown,
+	}
+
+	sshConfig := buildHostTestConfig(hostConfig, settings, baseConfig)
+	client, err := sshclient.NewSSHClient(sshConfig)
+	if err != nil {
+		result.ConnectionError = err
+		return result
+	}
+	defer func() {
+		if closeErr := client.ForceClose(); closeErr != nil {
+			logger.GetLogger().Debug("failed to close SSH client for host %s: %v", hostConfig.Name, closeErr)
+		}
+	}()
+
+	if err := client.ConnectDirect(); err != nil {
+		result.ConnectionError = err
+		return result
+	}
+
+	result.ConnectionSuccess = true
+	result.AuthMethod = client.AuthMethodUsed()
+
+	sshConfig.Command = "echo 'Connection test successful'"
+	output, execErr := client.ExecuteCommandWithOutput()
+	if execErr != nil {
+		result.CommandError = execErr
+		return result
+	}
+
+	result.CommandSuccess = true
+	result.CommandOutput = output
+	return result
+}
+
+func buildHostTestConfig(hostConfig *HostConfig, settings *Settings, baseConfig *sshclient.Config) *sshclient.Config {
+	testConfig := &sshclient.Config{
+		Host:        hostConfig.Host,
+		Port:        hostConfig.Port,
+		User:        hostConfig.User,
+		UseKeyAuth:  true,
+		DialTimeout: hostTestDialTimeout,
+	}
+
+	if baseConfig != nil {
+		testConfig.UseKeyAuth = baseConfig.UseKeyAuth
+		testConfig.KeyPath = baseConfig.KeyPath
+		testConfig.Password = baseConfig.Password
+		if baseConfig.DialTimeout > 0 {
+			testConfig.DialTimeout = baseConfig.DialTimeout
+		}
+	}
+
+	if testConfig.Port == "" {
+		testConfig.Port = sshclient.DefaultSSHPort
+	}
+	if testConfig.User == "" {
+		testConfig.User = sshclient.DefaultSSHUser
+	}
+
+	if !testConfig.UseKeyAuth {
+		testConfig.KeyPath = ""
+	} else if testConfig.KeyPath == "" && settings != nil && settings.Key != "" {
+		testConfig.KeyPath = settings.Key
+	}
+
+	if hostConfig.PasswordKey != "" {
+		if password, err := sshclient.GetSudoPassword(hostConfig.PasswordKey); err == nil {
+			testConfig.Password = password
+		} else {
+			logger.GetLogger().Warning("failed to get password from keyring (%s): %v", hostConfig.PasswordKey, err)
+		}
+	}
+
+	return testConfig
+}
+
+func formatAuthDescription(method sshclient.AuthMethod) string {
+	switch method {
+	case sshclient.AuthMethodKey:
+		return "SSH key"
+	case sshclient.AuthMethodPassword:
+		return "Password"
+	case sshclient.AuthMethodPasswordFallback:
+		return "Password (fallback after key failure)"
+	default:
+		return "Unknown"
+	}
+}
+
+type hostTestResult struct {
+	Host              HostConfig
+	AuthMethod        sshclient.AuthMethod
+	ConnectionSuccess bool
+	CommandSuccess    bool
+	ConnectionError   error
+	CommandError      error
+	CommandOutput     string
+}
+
+func (r hostTestResult) Success() bool {
+	return r.ConnectionSuccess && r.CommandSuccess
 }

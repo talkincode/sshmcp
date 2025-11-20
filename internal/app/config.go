@@ -14,6 +14,7 @@ func ParseArgs(args []string) *sshclient.Config {
 		Mode:        "ssh",
 		SafetyCheck: true,
 		Force:       false,
+		UseKeyAuth:  true,
 	}
 
 	if password := os.Getenv("SSH_PASSWORD"); password != "" {
@@ -21,6 +22,10 @@ func ParseArgs(args []string) *sshclient.Config {
 	}
 	if keyPath := os.Getenv("SSH_KEY_PATH"); keyPath != "" {
 		config.KeyPath = keyPath
+	}
+	if disableKey := os.Getenv("SSH_DISABLE_KEY"); strings.EqualFold(disableKey, "true") || disableKey == "1" {
+		config.UseKeyAuth = false
+		config.KeyPath = ""
 	}
 
 	if os.Getenv("SSH_NO_SAFETY_CHECK") == "true" {
@@ -47,8 +52,14 @@ func ParseArgs(args []string) *sshclient.Config {
 			config.User = strings.SplitN(arg, "=", 2)[1]
 		case strings.HasPrefix(arg, "-i="), strings.HasPrefix(arg, "--key="):
 			config.KeyPath = strings.SplitN(arg, "=", 2)[1]
+			config.UseKeyAuth = true
 		case strings.HasPrefix(arg, "-pk="), strings.HasPrefix(arg, "--password-key="):
 			config.SudoKey = strings.SplitN(arg, "=", 2)[1]
+		case arg == "--no-key", arg == "--password-only":
+			config.UseKeyAuth = false
+			config.KeyPath = ""
+		case arg == "--key-auth":
+			config.UseKeyAuth = true
 		case arg == "--force", arg == "-f":
 			config.Force = true
 		case arg == "--no-safety-check":
@@ -121,6 +132,9 @@ func ParseArgs(args []string) *sshclient.Config {
 			config.Mode = "host"
 			config.HostAction = "test"
 			config.HostName = strings.SplitN(arg, "=", 2)[1]
+		case arg == "--host-test-all":
+			config.Mode = "host"
+			config.HostAction = "test-all"
 		case strings.HasPrefix(arg, "--host-remove="), strings.HasPrefix(arg, "--host-rm="):
 			config.Mode = "host"
 			config.HostAction = "remove"

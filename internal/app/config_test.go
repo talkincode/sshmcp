@@ -56,6 +56,33 @@ func TestParseArgs_SSHWithKeyPath(t *testing.T) {
 	if config.KeyPath != "/path/to/key" {
 		t.Errorf("Expected key path '/path/to/key', got %s", config.KeyPath)
 	}
+	if !config.UseKeyAuth {
+		t.Errorf("Expected UseKeyAuth to be true when key path is provided")
+	}
+}
+
+func TestParseArgs_NoKeyFlagDisablesKeyAuth(t *testing.T) {
+	args := []string{"sshx", "-h=host", "--no-key", "uptime"}
+	config := ParseArgs(args)
+
+	if config.UseKeyAuth {
+		t.Errorf("Expected UseKeyAuth to be false when --no-key is set")
+	}
+	if config.KeyPath != "" {
+		t.Errorf("Expected key path to be empty when key auth disabled, got %s", config.KeyPath)
+	}
+}
+
+func TestParseArgs_KeyFlagReenablesKeyAuth(t *testing.T) {
+	args := []string{"sshx", "-h=host", "--no-key", "--key=/tmp/custom", "uptime"}
+	config := ParseArgs(args)
+
+	if !config.UseKeyAuth {
+		t.Errorf("Expected UseKeyAuth to be true after specifying --key")
+	}
+	if config.KeyPath != "/tmp/custom" {
+		t.Errorf("Expected key path '/tmp/custom', got %s", config.KeyPath)
+	}
 }
 
 func TestParseArgs_ForceFlag(t *testing.T) {
@@ -307,6 +334,18 @@ func TestParseArgs_PasswordList(t *testing.T) {
 	}
 }
 
+func TestParseArgs_HostTestAll(t *testing.T) {
+	args := []string{"sshx", "--host-test-all"}
+	config := ParseArgs(args)
+
+	if config.Mode != "host" {
+		t.Fatalf("expected mode 'host', got %s", config.Mode)
+	}
+	if config.HostAction != "test-all" {
+		t.Fatalf("expected host action 'test-all', got %s", config.HostAction)
+	}
+}
+
 func TestParseArgs_EnvVariables(t *testing.T) {
 	// Save original env
 	origPassword := os.Getenv("SSH_PASSWORD")
@@ -314,6 +353,7 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 	origNoSafety := os.Getenv("SSH_NO_SAFETY_CHECK")
 	origForce := os.Getenv("SSH_FORCE")
 	origSudoKey := os.Getenv("SSH_SUDO_KEY")
+	origDisableKey := os.Getenv("SSH_DISABLE_KEY")
 
 	// Cleanup
 	defer func() {
@@ -331,6 +371,9 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 		}
 		if err := os.Setenv("SSH_SUDO_KEY", origSudoKey); err != nil {
 			t.Logf("Failed to restore SSH_SUDO_KEY: %v", err)
+		}
+		if err := os.Setenv("SSH_DISABLE_KEY", origDisableKey); err != nil {
+			t.Logf("Failed to restore SSH_DISABLE_KEY: %v", err)
 		}
 	}()
 
@@ -368,6 +411,38 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 	}
 	if config.SudoKey != "custom-sudo" {
 		t.Errorf("Expected sudo key 'custom-sudo', got %s", config.SudoKey)
+	}
+	if !config.UseKeyAuth {
+		t.Errorf("Expected UseKeyAuth to remain true when not disabled")
+	}
+}
+
+func TestParseArgs_DisableKeyEnv(t *testing.T) {
+	origDisable := os.Getenv("SSH_DISABLE_KEY")
+	origKey := os.Getenv("SSH_KEY_PATH")
+	defer func() {
+		if err := os.Setenv("SSH_DISABLE_KEY", origDisable); err != nil {
+			t.Logf("Failed to restore SSH_DISABLE_KEY: %v", err)
+		}
+		if err := os.Setenv("SSH_KEY_PATH", origKey); err != nil {
+			t.Logf("Failed to restore SSH_KEY_PATH: %v", err)
+		}
+	}()
+
+	if err := os.Setenv("SSH_DISABLE_KEY", "true"); err != nil {
+		t.Fatalf("Failed to set SSH_DISABLE_KEY: %v", err)
+	}
+	if err := os.Setenv("SSH_KEY_PATH", "/env/key/path"); err != nil {
+		t.Fatalf("Failed to set SSH_KEY_PATH: %v", err)
+	}
+
+	config := ParseArgs([]string{"sshx", "-h=host", "uptime"})
+
+	if config.UseKeyAuth {
+		t.Errorf("Expected UseKeyAuth to be false when SSH_DISABLE_KEY is true")
+	}
+	if config.KeyPath != "" {
+		t.Errorf("Expected key path to be cleared when SSH_DISABLE_KEY is true, got %s", config.KeyPath)
 	}
 }
 

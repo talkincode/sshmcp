@@ -20,6 +20,7 @@ Usage:
   sshx --host-update                              # Update host configuration
   sshx --host-list                                # List configured hosts
   sshx --host-test=<name>                         # Test host connection
+  sshx --host-test-all                            # Test all host connections
   sshx --host-remove=<name>                       # Remove host configuration
 
 MCP Mode:
@@ -83,6 +84,7 @@ Host Management:
   --host-update                       Update existing host configuration
   --host-list                         List all configured hosts (alias: --host-ls)
   --host-test=<name>                  Test connection to configured host
+  --host-test-all                     Test connections for all configured hosts
   --host-remove=<name>                Remove host from configuration (alias: --host-rm)
 
   Host Add/Update Options:
@@ -200,6 +202,9 @@ Host Management Examples:
 
   # Test connection to a configured host
   sshx --host-test=prod-web
+
+  # Test all configured hosts and get a report with auth methods
+  sshx --host-test-all
 
   # Remove a host from configuration
   sshx --host-remove=prod-web

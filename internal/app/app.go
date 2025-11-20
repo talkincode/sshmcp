@@ -195,7 +195,7 @@ func resolveHostFromSettings(config *sshclient.Config) error {
 	}
 
 	// Use default SSH key from settings if available
-	if config.KeyPath == "" && settings.Key != "" {
+	if config.UseKeyAuth && config.KeyPath == "" && settings.Key != "" {
 		config.KeyPath = settings.Key
 		logger.GetLogger().Success("Using SSH key: %s", settings.Key)
 	}
