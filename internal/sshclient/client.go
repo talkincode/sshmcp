@@ -8,7 +8,9 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -52,6 +54,14 @@ type Config struct {
 
 	SafetyCheck bool
 	Force       bool
+	// AcceptUnknownHost controls whether sshx will automatically add
+	// previously unseen host keys to the user's known_hosts file.
+	AcceptUnknownHost bool
+	// AllowInsecureHostKey controls whether sshx may fall back to
+	// ssh.InsecureIgnoreHostKey (legacy behavior). Disabled by default.
+	AllowInsecureHostKey bool
+	// KnownHostsPath allows overriding the path to the known_hosts file.
+	KnownHostsPath string
 
 	SftpAction string
 	LocalPath  string
@@ -87,64 +97,178 @@ func (c *SSHClient) AuthMethodUsed() AuthMethod {
 	return c.authMethodUsed
 }
 
-// getHostKeyCallback returns a secure host key callback function
-// It tries to use known_hosts file, falls back to InsecureIgnoreHostKey with warning
-func getHostKeyCallback() ssh.HostKeyCallback {
+// getHostKeyCallback returns a secure host key callback function.
+// It enforces strict host key checking and only falls back to the insecure
+// mode when explicitly requested via configuration.
+func getHostKeyCallback(cfg *Config) (ssh.HostKeyCallback, error) {
 	lg := logger.GetLogger()
-	home, err := os.UserHomeDir()
-	if err != nil {
-		lg.Warning("Unable to get home directory, using insecure host key verification")
-		// #nosec G106 -- This is a fallback when known_hosts is unavailable
-		return ssh.InsecureIgnoreHostKey()
+	if cfg == nil {
+		cfg = &Config{}
 	}
 
-	knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
+	knownHostsPath := cfg.KnownHostsPath
+	if knownHostsPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			lg.Warning("Unable to determine home directory for known_hosts: %v", err)
+			if cfg.AllowInsecureHostKey {
+				lg.Warning("Falling back to insecure host key verification (explicitly allowed)")
+				// #nosec G106 -- Only allowed when the user opts in
+				return ssh.InsecureIgnoreHostKey(), nil
+			}
+			return nil, fmt.Errorf("unable to determine known_hosts path (set HOME or use --known-hosts): %w", err)
+		}
+		knownHostsPath = filepath.Join(home, ".ssh", "known_hosts")
+	}
 
-	// Try to use known_hosts file
+	if err := ensureKnownHostsFile(knownHostsPath); err != nil {
+		if cfg.AllowInsecureHostKey {
+			lg.Warning("Unable to prepare known_hosts at %s: %v", knownHostsPath, err)
+			lg.Warning("Falling back to insecure host key verification (explicitly allowed)")
+			// #nosec G106 -- User explicitly allowed insecure host key verification
+			return ssh.InsecureIgnoreHostKey(), nil
+		}
+		return nil, err
+	}
+
 	hostKeyCallback, err := knownhosts.New(knownHostsPath)
 	if err != nil {
-		// If known_hosts doesn't exist or can't be read, create it or use insecure mode
-		if os.IsNotExist(err) {
-			lg.Warning("known_hosts file not found at %s", knownHostsPath)
-			lg.Warning("Using insecure host key verification (vulnerable to MITM attacks)")
-			lg.Tip("Run 'ssh-keyscan %s >> %s' to add host keys", "HOST", knownHostsPath)
-		} else {
-			lg.Warning("Failed to load known_hosts: %v", err)
-			lg.Warning("Using insecure host key verification")
+		if cfg.AllowInsecureHostKey {
+			lg.Warning("Failed to load known_hosts from %s: %v", knownHostsPath, err)
+			lg.Warning("Falling back to insecure host key verification (explicitly allowed)")
+			// #nosec G106 -- User explicitly allowed insecure host key verification
+			return ssh.InsecureIgnoreHostKey(), nil
 		}
-		// #nosec G106 -- Documented fallback with user warning
-		return ssh.InsecureIgnoreHostKey()
+		return nil, fmt.Errorf("failed to load known_hosts from %s: %w", knownHostsPath, err)
 	}
+
+	var callbackMu sync.Mutex
 
 	// Wrap the callback to handle key verification errors gracefully
 	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		callbackMu.Lock()
+		defer callbackMu.Unlock()
+
 		err := hostKeyCallback(hostname, remote, key)
-		if err != nil {
-			// Check if it's a knownhosts.KeyError (host key mismatch or unknown host)
-			var keyErr *knownhosts.KeyError
-			if keyError, ok := err.(*knownhosts.KeyError); ok {
-				keyErr = keyError
-				// If there are known keys but they don't match, it's a key change
-				if len(keyErr.Want) > 0 {
-					return fmt.Errorf("⚠️  HOST KEY VERIFICATION FAILED!\n"+
-						"The host key for %s has changed.\n"+
-						"This could indicate a man-in-the-middle attack.\n"+
-						"Remove the old key from %s and verify the new key before connecting.\n"+
-						"Original error: %w", hostname, knownHostsPath, err)
-				}
-				// If no known keys exist, it's an unknown host
-				return fmt.Errorf("⚠️  Host %s is not in known_hosts file.\n"+
-					"To add this host, run:\n"+
-					"  ssh-keyscan -H %s >> %s\n"+
-					"Or connect manually first:\n"+
-					"  ssh %s@%s\n"+
-					"Original error: %w",
-					hostname, hostname, knownHostsPath, "USER", hostname, err)
-			}
+		if err == nil {
+			return nil
+		}
+
+		var keyErr *knownhosts.KeyError
+		if !errors.As(err, &keyErr) {
 			return err
+		}
+
+		// If there are known keys but they don't match, it's a key change
+		if len(keyErr.Want) > 0 {
+			return fmt.Errorf("⚠️  HOST KEY VERIFICATION FAILED!\n"+
+				"The host key for %s has changed.\n"+
+				"This could indicate a man-in-the-middle attack.\n"+
+				"Remove the old key from %s and verify the new key before connecting.\n"+
+				"Original error: %w", hostname, knownHostsPath, err)
+		}
+
+		if cfg.AcceptUnknownHost {
+			hostPatterns := normalizeHostPatterns(hostname, remote)
+			if len(hostPatterns) == 0 {
+				hostPatterns = []string{hostname}
+			}
+			if appendErr := appendHostKey(knownHostsPath, hostPatterns, key); appendErr != nil {
+				return fmt.Errorf("failed to record new host key for %s: %w", hostname, appendErr)
+			}
+			lg.Success("Trusted new host %s and saved its key to %s", hostname, knownHostsPath)
+			freshCallback, reloadErr := knownhosts.New(knownHostsPath)
+			if reloadErr != nil {
+				return fmt.Errorf("failed to reload known_hosts after adding %s: %w", hostname, reloadErr)
+			}
+			hostKeyCallback = freshCallback
+			return nil
+		}
+
+		return fmt.Errorf("⚠️  Host %s is not in known_hosts file (%s).\n"+
+			"To add this host, run:\n"+
+			"  ssh-keyscan -H %s >> %s\n"+
+			"Or re-run sshx with --accept-unknown-host to trust it automatically.\n"+
+			"Original error: %w",
+			hostname, knownHostsPath, hostname, knownHostsPath, err)
+	}, nil
+}
+
+func ensureKnownHostsFile(path string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("failed to create directory %s for known_hosts: %w", dir, err)
+	}
+
+	info, err := os.Stat(path)
+	if err == nil {
+		if info.IsDir() {
+			return fmt.Errorf("known_hosts path %s is a directory", path)
 		}
 		return nil
 	}
+
+	if os.IsNotExist(err) {
+		file, createErr := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o600) // #nosec G304 -- user-provided path validated earlier
+		if createErr != nil {
+			return fmt.Errorf("failed to create known_hosts file at %s: %w", path, createErr)
+		}
+		return file.Close()
+	}
+
+	return fmt.Errorf("unable to access known_hosts file at %s: %w", path, err)
+}
+
+func appendHostKey(path string, hostnames []string, key ssh.PublicKey) (err error) {
+	if len(hostnames) == 0 {
+		return fmt.Errorf("no hostnames provided for known_hosts entry")
+	}
+	line := knownhosts.Line(hostnames, key)
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600) // #nosec G304 -- caller controls path and permissions
+	if os.IsNotExist(err) {
+		if ensureErr := ensureKnownHostsFile(path); ensureErr != nil {
+			return ensureErr
+		}
+		file, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600) // #nosec G304 -- path validated above
+	}
+	if err != nil {
+		return fmt.Errorf("failed to open known_hosts file %s: %w", path, err)
+	}
+	defer errutil.HandleCloseError(&err, file)
+	if _, writeErr := file.WriteString(line + "\n"); writeErr != nil {
+		return fmt.Errorf("failed to append host key to %s: %w", path, writeErr)
+	}
+	return nil
+}
+
+func normalizeHostPatterns(hostname string, remote net.Addr) []string {
+	patterns := map[string]struct{}{}
+	add := func(value string) {
+		if value == "" {
+			return
+		}
+		patterns[value] = struct{}{}
+	}
+
+	if host, port, err := net.SplitHostPort(hostname); err == nil {
+		add(fmt.Sprintf("[%s]:%s", host, port))
+		add(host)
+	} else {
+		add(hostname)
+	}
+
+	if remote != nil {
+		if host, _, err := net.SplitHostPort(remote.String()); err == nil {
+			add(host)
+		}
+	}
+
+	result := make([]string, 0, len(patterns))
+	for entry := range patterns {
+		result = append(result, entry)
+	}
+	sort.Strings(result)
+	return result
 }
 
 // NewSSHClient 创建SSH客户端
@@ -228,11 +352,16 @@ func (c *SSHClient) ConnectDirect() error {
 		return fmt.Errorf("no authentication method available")
 	}
 
+	hostKeyCallback, err := getHostKeyCallback(c.config)
+	if err != nil {
+		return fmt.Errorf("failed to configure host key verification: %w", err)
+	}
+
 	dialWithAuth := func(methods []ssh.AuthMethod) (*ssh.Client, error) {
 		sshConfig := &ssh.ClientConfig{
 			User:            c.config.User,
 			Auth:            methods,
-			HostKeyCallback: getHostKeyCallback(),
+			HostKeyCallback: hostKeyCallback,
 			Timeout:         timeout,
 		}
 

@@ -27,6 +27,15 @@ func ParseArgs(args []string) *sshclient.Config {
 		config.UseKeyAuth = false
 		config.KeyPath = ""
 	}
+	if knownHosts := os.Getenv("SSH_KNOWN_HOSTS"); knownHosts != "" {
+		config.KnownHostsPath = knownHosts
+	}
+	if acceptUnknown := os.Getenv("SSH_ACCEPT_UNKNOWN_HOST"); strings.EqualFold(acceptUnknown, "true") || acceptUnknown == "1" {
+		config.AcceptUnknownHost = true
+	}
+	if insecure := os.Getenv("SSH_INSECURE_HOST_KEY"); strings.EqualFold(insecure, "true") || insecure == "1" {
+		config.AllowInsecureHostKey = true
+	}
 
 	if os.Getenv("SSH_NO_SAFETY_CHECK") == "true" {
 		config.SafetyCheck = false
@@ -62,6 +71,14 @@ func ParseArgs(args []string) *sshclient.Config {
 			config.UseKeyAuth = true
 		case arg == "--force", arg == "-f":
 			config.Force = true
+		case arg == "--accept-unknown-host":
+			config.AcceptUnknownHost = true
+		case arg == "--insecure-hostkey":
+			config.AllowInsecureHostKey = true
+		case arg == "--strict-host-key":
+			config.AllowInsecureHostKey = false
+		case strings.HasPrefix(arg, "--known-hosts="):
+			config.KnownHostsPath = strings.SplitN(arg, "=", 2)[1]
 		case arg == "--no-safety-check":
 			config.SafetyCheck = false
 		case arg == "--sftp":

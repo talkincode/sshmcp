@@ -372,6 +372,19 @@ sshx -h=192.168.1.101 -pk=server-B "sudo systemctl restart nginx"
 sshx -h=192.168.1.102 -pk=server-C "sudo systemctl restart nginx"
 ```
 
+## Host Key Verification 🔐
+
+`sshx` now enforces strict host key verification just like the OpenSSH client. Instead of silently trusting unknown hosts, the tool reads the trust store from `~/.ssh/known_hosts` (or the path you provide) and aborts the connection if the host is missing or the key changes.
+
+Ways to manage host keys:
+
+- **Add hosts manually** (recommended): `ssh-keyscan -H <host> >> ~/.ssh/known_hosts`
+- **One-time automatic trust**: `sshx --accept-unknown-host -h=<host> ...` (or set `SSH_ACCEPT_UNKNOWN_HOST=1`). The first connection records the key; subsequent runs stay strict.
+- **Custom trust store**: `sshx --known-hosts=/path/to/known_hosts` or `SSH_KNOWN_HOSTS=/path/to/known_hosts`.
+- **Legacy insecure mode (last resort)**: `sshx --insecure-hostkey ...` or `SSH_INSECURE_HOST_KEY=1`. This re-enables the previous `InsecureIgnoreHostKey` behavior and should only be used in controlled environments.
+
+If the host key ever changes, `sshx` clearly explains how to remove the old entry before re-connecting, protecting you from potential man-in-the-middle attacks.
+
 ### Password Key Names
 
 - **master**: Default sudo password key name, used for sudo commands

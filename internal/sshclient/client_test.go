@@ -1,12 +1,16 @@
 package sshclient
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -282,4 +286,51 @@ func TestShouldFallbackToPassword(t *testing.T) {
 	t.Run("nil error", func(t *testing.T) {
 		assert.False(t, shouldFallbackToPassword(nil, true, true))
 	})
+}
+
+func TestGetHostKeyCallbackAcceptsUnknownHost(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	cfg := &Config{AcceptUnknownHost: true}
+	callback, err := getHostKeyCallback(cfg)
+	require.NoError(t, err)
+
+	remote := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 22}
+	key := generateTestPublicKey(t)
+	hostWithPort := net.JoinHostPort("test-host", "22")
+	require.NoError(t, callback(hostWithPort, remote, key))
+
+	knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
+	data, readErr := os.ReadFile(knownHostsPath) //nolint:gosec // G304: test reads file from controlled temp dir
+	require.NoError(t, readErr)
+	assert.Contains(t, string(data), "test-host")
+}
+
+func TestGetHostKeyCallbackStrictModeRejectsUnknownHost(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	cfg := &Config{}
+	callback, err := getHostKeyCallback(cfg)
+	require.NoError(t, err)
+
+	remote := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 22}
+	key := generateTestPublicKey(t)
+	hostWithPort := net.JoinHostPort("strict-host", "22")
+	err = callback(hostWithPort, remote, key)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not in known_hosts")
+
+	knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
+	data, readErr := os.ReadFile(knownHostsPath) //nolint:gosec // G304: test reads file from controlled temp dir
+	require.NoError(t, readErr)
+	assert.Equal(t, "", string(data))
+}
+
+func generateTestPublicKey(t *testing.T) ssh.PublicKey {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	signer, err := ssh.NewSignerFromKey(priv)
+	require.NoError(t, err)
+	return signer.PublicKey()
 }

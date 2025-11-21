@@ -199,6 +199,19 @@ sshx mcp-stdio
 sshx --host-test-all
 ```
 
+## 主机密钥校验 🔐
+
+`sshx` 现在默认与 OpenSSH 一样严格验证主机密钥。程序会读取 `~/.ssh/known_hosts`（或你指定的路径），当主机不存在或密钥发生变化时会立即中断连接并给出修复方案，从源头降低中间人攻击风险。
+
+管理主机密钥的方式：
+
+- **手动添加（推荐）**：`ssh-keyscan -H <host> >> ~/.ssh/known_hosts`
+- **首次自动信任**：`sshx --accept-unknown-host -h=<host> ...`（或设置 `SSH_ACCEPT_UNKNOWN_HOST=1`）。第一次连接会写入 known_hosts，之后依旧保持严格校验。
+- **自定义信任库**：`sshx --known-hosts=/path/to/known_hosts` 或设置 `SSH_KNOWN_HOSTS=/path/to/known_hosts`。
+- **兼容旧行为（不推荐）**：`sshx --insecure-hostkey ...` 或 `SSH_INSECURE_HOST_KEY=1`。这会重新启用 `InsecureIgnoreHostKey`，只应在完全受控的环境下短暂使用。
+
+当远端主机密钥变化时，`sshx` 会提示先删除旧条目再重新连接，确保整个流程可追溯且安全。
+
 ## 密码管理
 
 `sshx` 使用操作系统的原生凭据管理器提供安全的密码存储，无需重复输入密码或以明文形式存储密码。

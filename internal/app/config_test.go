@@ -104,6 +104,26 @@ func TestParseArgs_ForceFlag(t *testing.T) {
 	}
 }
 
+func TestParseArgs_HostKeyFlags(t *testing.T) {
+	args := []string{"sshx", "-h=host", "--accept-unknown-host", "--known-hosts=/tmp/known", "--insecure-hostkey", "uptime"}
+	config := ParseArgs(args)
+	if !config.AcceptUnknownHost {
+		t.Fatalf("expected AcceptUnknownHost to be true")
+	}
+	if config.KnownHostsPath != "/tmp/known" {
+		t.Fatalf("expected KnownHostsPath '/tmp/known', got %s", config.KnownHostsPath)
+	}
+	if !config.AllowInsecureHostKey {
+		t.Fatalf("expected AllowInsecureHostKey to be true")
+	}
+
+	args = []string{"sshx", "-h=host", "--accept-unknown-host", "--strict-host-key", "uptime"}
+	config = ParseArgs(args)
+	if config.AllowInsecureHostKey {
+		t.Fatalf("expected AllowInsecureHostKey to be false after --strict-host-key")
+	}
+}
+
 func TestParseArgs_NoSafetyCheck(t *testing.T) {
 	args := []string{"sshx", "-h=host", "--no-safety-check", "uptime"}
 	config := ParseArgs(args)
@@ -354,6 +374,9 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 	origForce := os.Getenv("SSH_FORCE")
 	origSudoKey := os.Getenv("SSH_SUDO_KEY")
 	origDisableKey := os.Getenv("SSH_DISABLE_KEY")
+	origKnownHosts := os.Getenv("SSH_KNOWN_HOSTS")
+	origAcceptUnknown := os.Getenv("SSH_ACCEPT_UNKNOWN_HOST")
+	origInsecure := os.Getenv("SSH_INSECURE_HOST_KEY")
 
 	// Cleanup
 	defer func() {
@@ -375,6 +398,15 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 		if err := os.Setenv("SSH_DISABLE_KEY", origDisableKey); err != nil {
 			t.Logf("Failed to restore SSH_DISABLE_KEY: %v", err)
 		}
+		if err := os.Setenv("SSH_KNOWN_HOSTS", origKnownHosts); err != nil {
+			t.Logf("Failed to restore SSH_KNOWN_HOSTS: %v", err)
+		}
+		if err := os.Setenv("SSH_ACCEPT_UNKNOWN_HOST", origAcceptUnknown); err != nil {
+			t.Logf("Failed to restore SSH_ACCEPT_UNKNOWN_HOST: %v", err)
+		}
+		if err := os.Setenv("SSH_INSECURE_HOST_KEY", origInsecure); err != nil {
+			t.Logf("Failed to restore SSH_INSECURE_HOST_KEY: %v", err)
+		}
 	}()
 
 	// Test password from env
@@ -392,6 +424,15 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 	}
 	if err := os.Setenv("SSH_SUDO_KEY", "custom-sudo"); err != nil {
 		t.Fatalf("Failed to set SSH_SUDO_KEY: %v", err)
+	}
+	if err := os.Setenv("SSH_KNOWN_HOSTS", "/env/known_hosts"); err != nil {
+		t.Fatalf("Failed to set SSH_KNOWN_HOSTS: %v", err)
+	}
+	if err := os.Setenv("SSH_ACCEPT_UNKNOWN_HOST", "1"); err != nil {
+		t.Fatalf("Failed to set SSH_ACCEPT_UNKNOWN_HOST: %v", err)
+	}
+	if err := os.Setenv("SSH_INSECURE_HOST_KEY", "true"); err != nil {
+		t.Fatalf("Failed to set SSH_INSECURE_HOST_KEY: %v", err)
 	}
 
 	args := []string{"sshx", "-h=host", "uptime"}
@@ -414,6 +455,15 @@ func TestParseArgs_EnvVariables(t *testing.T) {
 	}
 	if !config.UseKeyAuth {
 		t.Errorf("Expected UseKeyAuth to remain true when not disabled")
+	}
+	if config.KnownHostsPath != "/env/known_hosts" {
+		t.Errorf("Expected KnownHostsPath '/env/known_hosts', got %s", config.KnownHostsPath)
+	}
+	if !config.AcceptUnknownHost {
+		t.Errorf("Expected AcceptUnknownHost to be true from env")
+	}
+	if !config.AllowInsecureHostKey {
+		t.Errorf("Expected AllowInsecureHostKey to be true from env")
 	}
 }
 
